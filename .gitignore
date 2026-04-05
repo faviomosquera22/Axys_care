@@ -1,0 +1,15 @@
+node_modules/
+.turbo/
+.expo/
+.next/
+dist/
+build/
+coverage/
+.DS_Store
+.env
+.env.local
+.env.*.local
+apps/mobile/.expo/
+apps/mobile/dist/
+supabase/.temp/
+REPOS/
