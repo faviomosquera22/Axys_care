@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@axyscare/core-types": ["packages/core-types/src"],
+      "@axyscare/core-validation": ["packages/core-validation/src"],
+      "@axyscare/core-clinical": ["packages/core-clinical/src"],
+      "@axyscare/core-catalogs": ["packages/core-catalogs/src"],
+      "@axyscare/core-db": ["packages/core-db/src"],
+      "@axyscare/ui-shared": ["packages/ui-shared/src"]
+    }
+  }
+}
+

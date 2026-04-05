@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "preserve",
+    "incremental": true,
+    "paths": {
+      "@/*": ["./*"],
+      "@axyscare/core-types": ["../../packages/core-types/src"],
+      "@axyscare/core-validation": ["../../packages/core-validation/src"],
+      "@axyscare/core-clinical": ["../../packages/core-clinical/src"],
+      "@axyscare/core-catalogs": ["../../packages/core-catalogs/src"],
+      "@axyscare/core-db": ["../../packages/core-db/src"],
+      "@axyscare/ui-shared": ["../../packages/ui-shared/src"]
+    },
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

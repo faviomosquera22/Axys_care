@@ -1,0 +1,46 @@
+{
+  "name": "@axyscare/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@axyscare/core-catalogs": "workspace:*",
+    "@axyscare/core-clinical": "workspace:*",
+    "@axyscare/core-db": "workspace:*",
+    "@axyscare/core-types": "workspace:*",
+    "@axyscare/core-validation": "workspace:*",
+    "@axyscare/ui-shared": "workspace:*",
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
+    "@hookform/resolvers": "^5.2.2",
+    "@react-pdf/renderer": "^4.3.1",
+    "@tanstack/react-query": "^5.96.2",
+    "@tanstack/react-query-devtools": "^5.96.2",
+    "date-fns": "^4.1.0",
+    "next": "^16.1.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-hook-form": "^7.66.0",
+    "react-pdf": "^10.2.0",
+    "recharts": "^3.2.1",
+    "signature_pad": "^5.1.3",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "typescript": "^5.9.3"
+  }
+}
+

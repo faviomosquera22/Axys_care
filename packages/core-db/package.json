@@ -1,0 +1,20 @@
+{
+  "name": "@axyscare/core-db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@axyscare/core-clinical": "workspace:*",
+    "@axyscare/core-types": "workspace:*",
+    "@axyscare/core-validation": "workspace:*",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.79.0"
+  }
+}
+
