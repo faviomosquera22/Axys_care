@@ -16,6 +16,7 @@
     "@axyscare/core-types": "workspace:*",
     "@axyscare/core-validation": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
+    "@supabase/supabase-js": "^2.79.0",
     "@tanstack/react-query": "^5.96.2",
     "expo": "~55.0.2",
     "expo-constants": "~55.0.7",
@@ -44,4 +45,3 @@
     "typescript": "~5.9.2"
   }
 }
-
