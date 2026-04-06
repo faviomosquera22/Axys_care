@@ -24,6 +24,7 @@ export function RegisterForm() {
   const { client } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const form = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: { email: "", password: "", confirmPassword: "" },
@@ -34,14 +35,22 @@ export function RegisterForm() {
       className="stack"
       onSubmit={form.handleSubmit(async ({ email, password }) => {
         setServerError(null);
+        setSuccessMessage(null);
         if (!isSupabaseConfigured()) {
           setServerError("Configura las variables de Supabase antes de registrar usuarios.");
           return;
         }
 
         try {
-          await signUpWithPassword(client, { email, password });
-          router.push("/login");
+          const result = await signUpWithPassword(client, { email, password });
+
+          if (result.session) {
+            router.push("/dashboard");
+            return;
+          }
+
+          setSuccessMessage("Cuenta creada. Revisa tu correo para confirmar el acceso antes de iniciar sesión.");
+          form.reset();
         } catch (error) {
           setServerError(error instanceof Error ? error.message : "No se pudo registrar.");
         }
@@ -56,6 +65,7 @@ export function RegisterForm() {
       <FormField label="Confirmar contraseña" error={form.formState.errors.confirmPassword?.message}>
         <input type="password" {...form.register("confirmPassword")} />
       </FormField>
+      {successMessage ? <div className="form-success">{successMessage}</div> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
       <button className="btn" disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? "Creando..." : "Crear cuenta"}
@@ -66,4 +76,3 @@ export function RegisterForm() {
     </form>
   );
 }
-

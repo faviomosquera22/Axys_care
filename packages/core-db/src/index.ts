@@ -47,7 +47,10 @@ export function getSupabaseUrl() {
 
 export function getSupabaseAnonKey() {
   return (
-    getEnvValue("NEXT_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_SUPABASE_ANON_KEY") ??
+    getEnvValue("NEXT_PUBLIC_SUPABASE_ANON_KEY") ??
+    getEnvValue("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
+    getEnvValue("EXPO_PUBLIC_SUPABASE_ANON_KEY") ??
+    getEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
     "demo-anon-key"
   );
 }
