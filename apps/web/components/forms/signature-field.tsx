@@ -43,6 +43,21 @@ export function SignatureField({
     <div className="stack">
       <canvas ref={canvasRef} className="signature-canvas" />
       <div className="btn-row">
+        <label className="btn secondary">
+          Subir PNG
+          <input
+            type="file"
+            accept="image/png"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => onChange(String(reader.result ?? ""));
+              reader.readAsDataURL(file);
+            }}
+          />
+        </label>
         <button
           type="button"
           className="btn secondary"
@@ -54,7 +69,7 @@ export function SignatureField({
           Limpiar firma
         </button>
       </div>
+      {value ? <img src={value} alt="Firma profesional" className="signature-preview" /> : null}
     </div>
   );
 }
-

@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     const { data: patient } = await supabase
       .from("patients")
-      .select("first_name, last_name, document_number")
+      .select("first_name, last_name, document_number, email")
       .eq("id", appointment.patient_id)
       .single();
 
@@ -108,6 +108,7 @@ export async function POST(request: Request) {
       endAt: appointment.end_at,
       modality: appointment.modality,
       meetLink: appointment.meet_link,
+      attendeeEmails: patient?.email ? [patient.email] : [],
     });
 
     const generatedMeetLink =

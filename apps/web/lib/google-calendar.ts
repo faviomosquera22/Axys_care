@@ -134,6 +134,7 @@ export async function createOrUpdateGoogleCalendarEvent(params: {
   endAt: string;
   modality: string;
   meetLink?: string | null;
+  attendeeEmails?: string[];
 }) {
   const { timezone } = getGoogleCalendarBaseConfig();
   const calendarId = params.calendarId || "primary";
@@ -143,6 +144,9 @@ export async function createOrUpdateGoogleCalendarEvent(params: {
 
   if (isVirtual) {
     url.searchParams.set("conferenceDataVersion", "1");
+  }
+  if (params.attendeeEmails?.length) {
+    url.searchParams.set("sendUpdates", "all");
   }
 
   const eventBody = {
@@ -164,6 +168,11 @@ export async function createOrUpdateGoogleCalendarEvent(params: {
         { method: "email", minutes: 120 },
       ],
     },
+    attendees: params.attendeeEmails?.length
+      ? params.attendeeEmails.map((email) => ({
+          email,
+        }))
+      : undefined,
     conferenceData: isVirtual
       ? {
           createRequest: {
