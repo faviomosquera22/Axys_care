@@ -84,6 +84,8 @@ export interface ProfessionalSettings extends AuditFields {
   };
   signatureFooter?: string | null;
   googleCalendarConnected: boolean;
+  googleCalendarEmail?: string | null;
+  googleCalendarPrimaryCalendarId?: string | null;
 }
 
 export interface Patient extends TraceabilityFields {

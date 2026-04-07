@@ -1,5 +1,6 @@
 import { calculateBMI, calculateMAP } from "@axyscare/core-clinical";
 import type {
+  Attachment,
   Appointment,
   ClinicalNote,
   DashboardSnapshot,
@@ -34,23 +35,20 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export type Database = Record<string, never>;
 
-function getEnvValue(primary: string, secondary?: string) {
-  return process.env[primary] ?? (secondary ? process.env[secondary] : undefined);
-}
-
 export function getSupabaseUrl() {
   return (
-    getEnvValue("NEXT_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_URL") ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.EXPO_PUBLIC_SUPABASE_URL ??
     "https://example.supabase.co"
   );
 }
 
 export function getSupabaseAnonKey() {
   return (
-    getEnvValue("NEXT_PUBLIC_SUPABASE_ANON_KEY") ??
-    getEnvValue("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
-    getEnvValue("EXPO_PUBLIC_SUPABASE_ANON_KEY") ??
-    getEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     "demo-anon-key"
   );
 }
@@ -249,6 +247,12 @@ export async function listOwnedPatients(client: SupabaseClient, search?: string)
 export async function getPatient(client: SupabaseClient, patientId: string) {
   const row = await unwrap(client.from("patients").select("*").eq("id", patientId).single());
   return fromPatientRow(row);
+}
+
+export async function getEncounter(client: SupabaseClient, encounterId: string) {
+  const row = await unwrap(client.from("encounters").select("*").eq("id", encounterId).single());
+  const profiles = await getProfilesMap(client, [row.created_by, row.updated_by].filter(Boolean) as string[]);
+  return fromEncounterRow(row, profiles);
 }
 
 export async function upsertPatient(client: SupabaseClient, input: PatientInput & { id?: string }) {
@@ -567,6 +571,101 @@ export async function listProcedures(client: SupabaseClient, encounterId?: strin
   return (rows ?? []).map((row: any) => fromProcedureRow(row, profiles));
 }
 
+export async function listExamOrders(client: SupabaseClient, encounterId?: string) {
+  let query = client.from("exam_orders").select("*").order("ordered_at", { ascending: false });
+  if (encounterId) query = query.eq("encounter_id", encounterId);
+  const rows = await unwrap(query);
+  const profiles = await getProfilesMap(
+    client,
+    (rows ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+  );
+  return (rows ?? []).map((row: any) => fromExamOrderRow(row, profiles));
+}
+
+export async function createExamOrder(
+  client: SupabaseClient,
+  input: Pick<ExamOrder, "encounterId" | "category" | "examName" | "instructions" | "status" | "orderedAt">,
+) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+  const encounterContext = await getEncounterContext(client, input.encounterId);
+
+  const row = await unwrap(
+    client
+      .from("exam_orders")
+      .insert({
+        owner_user_id: encounterContext.ownerUserId,
+        encounter_id: input.encounterId,
+        category: input.category,
+        exam_name: input.examName,
+        instructions: input.instructions,
+        status: input.status,
+        ordered_at: input.orderedAt,
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      })
+      .select()
+      .single(),
+  );
+  const profiles = await getProfilesMap(client, [actorUserId]);
+  return fromExamOrderRow(row, profiles);
+}
+
+export async function listAttachments(
+  client: SupabaseClient,
+  filters?: { patientId?: string; encounterId?: string; examOrderId?: string },
+) {
+  let query = client.from("attachments").select("*").order("created_at", { ascending: false });
+  if (filters?.patientId) query = query.eq("patient_id", filters.patientId);
+  if (filters?.encounterId) query = query.eq("encounter_id", filters.encounterId);
+  if (filters?.examOrderId) query = query.eq("exam_order_id", filters.examOrderId);
+  const rows = await unwrap(query);
+  const profiles = await getProfilesMap(
+    client,
+    (rows ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+  );
+  return (rows ?? []).map((row: any) => fromAttachmentRow(row, profiles));
+}
+
+export async function createAttachmentRecord(
+  client: SupabaseClient,
+  input: Pick<Attachment, "patientId" | "encounterId" | "examOrderId" | "bucket" | "path" | "fileName" | "mimeType" | "category">,
+) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+
+  let ownerUserId = actorUserId;
+  if (input.patientId) {
+    const patientContext = await getPatientContext(client, input.patientId);
+    ownerUserId = patientContext.ownerUserId;
+  } else if (input.encounterId) {
+    const encounterContext = await getEncounterContext(client, input.encounterId);
+    ownerUserId = encounterContext.ownerUserId;
+  }
+
+  const row = await unwrap(
+    client
+      .from("attachments")
+      .insert({
+        owner_user_id: ownerUserId,
+        patient_id: input.patientId,
+        encounter_id: input.encounterId,
+        exam_order_id: input.examOrderId,
+        storage_bucket: input.bucket,
+        storage_path: input.path,
+        file_name: input.fileName,
+        mime_type: input.mimeType,
+        category: input.category,
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      })
+      .select()
+      .single(),
+  );
+  const profiles = await getProfilesMap(client, [actorUserId]);
+  return fromAttachmentRow(row, profiles);
+}
+
 export async function listClinicalNotes(client: SupabaseClient, encounterId: string) {
   const rows = await unwrap(
     client.from("clinical_notes").select("*").eq("encounter_id", encounterId).order("created_at", { ascending: false }),
@@ -869,7 +968,7 @@ export function subscribeToPatientRealtime(
 }
 
 export async function getEncounterBundle(client: SupabaseClient, encounterId: string) {
-  const [encounter, vitals, medical, nursing, notes, diagnoses, procedures] = await Promise.all([
+  const [encounter, vitals, medical, nursing, notes, diagnoses, procedures, examOrders, attachments] = await Promise.all([
     unwrap(client.from("encounters").select("*").eq("id", encounterId).single()),
     unwrap(client.from("vital_signs").select("*").eq("encounter_id", encounterId).maybeSingle()),
     unwrap(client.from("medical_assessments").select("*").eq("encounter_id", encounterId).maybeSingle()),
@@ -877,6 +976,8 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
     unwrap(client.from("clinical_notes").select("*").eq("encounter_id", encounterId).order("created_at")),
     unwrap(client.from("diagnoses").select("*").eq("encounter_id", encounterId).order("created_at")),
     unwrap(client.from("procedures").select("*").eq("encounter_id", encounterId).order("performed_at", { ascending: false })),
+    unwrap(client.from("exam_orders").select("*").eq("encounter_id", encounterId).order("ordered_at", { ascending: false })),
+    unwrap(client.from("attachments").select("*").eq("encounter_id", encounterId).order("created_at", { ascending: false })),
   ]);
 
   const profiles = await getProfilesMap(
@@ -893,6 +994,8 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
       ...(notes ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
       ...(diagnoses ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
       ...(procedures ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+      ...(examOrders ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+      ...(attachments ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
     ].filter(Boolean) as string[],
   );
 
@@ -904,6 +1007,8 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
     notes: (notes ?? []).map((row: any) => fromClinicalNoteRow(row, profiles)),
     diagnoses: (diagnoses ?? []).map((row: any) => fromDiagnosisRow(row, profiles)),
     procedures: (procedures ?? []).map((row: any) => fromProcedureRow(row, profiles)),
+    examOrders: (examOrders ?? []).map((row: any) => fromExamOrderRow(row, profiles)),
+    attachments: (attachments ?? []).map((row: any) => fromAttachmentRow(row, profiles)),
   };
 }
 
@@ -1047,6 +1152,8 @@ function fromProfessionalSettingsRow(row: any): ProfessionalSettings {
     letterheadFormat: row.letterhead_format ?? {},
     signatureFooter: row.signature_footer,
     googleCalendarConnected: row.google_calendar_connected ?? false,
+    googleCalendarEmail: row.google_calendar_email ?? null,
+    googleCalendarPrimaryCalendarId: row.google_calendar_primary_calendar_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1244,6 +1351,22 @@ function fromExamResultRow(row: any, profiles?: Map<string, Profile>): ExamResul
     resultSummary: row.result_summary,
     interpretation: row.interpretation,
     status: row.status,
+    ...mapTraceability(row, profiles),
+  };
+}
+
+function fromAttachmentRow(row: any, profiles?: Map<string, Profile>): Attachment {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    patientId: row.patient_id,
+    encounterId: row.encounter_id,
+    examOrderId: row.exam_order_id,
+    bucket: row.storage_bucket,
+    path: row.storage_path,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    category: row.category,
     ...mapTraceability(row, profiles),
   };
 }

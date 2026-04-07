@@ -3,13 +3,38 @@
 import { appointmentStatuses, appointmentTypes } from "@axyscare/core-catalogs";
 import type { Appointment, Patient } from "@axyscare/core-types";
 import { appointmentSchema, type AppointmentInput } from "@axyscare/core-validation";
-import { upsertAppointment } from "@axyscare/core-db";
+import { getProfessionalSettings, upsertAppointment } from "@axyscare/core-db";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormField } from "@/components/forms/form-ui";
 import { useAuth } from "@/components/providers/providers";
+
+function formatGoogleCalendarDate(value: string) {
+  return new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function buildGoogleCalendarUrl(params: {
+  title: string;
+  details?: string;
+  startAt: string;
+  endAt: string;
+  location?: string;
+}) {
+  const search = new URLSearchParams({
+    action: "TEMPLATE",
+    text: params.title,
+    details: params.details ?? "",
+    dates: `${formatGoogleCalendarDate(params.startAt)}/${formatGoogleCalendarDate(params.endAt)}`,
+  });
+
+  if (params.location) {
+    search.set("location", params.location);
+  }
+
+  return `https://calendar.google.com/calendar/render?${search.toString()}`;
+}
 
 export function AppointmentForm({
   patients,
@@ -39,6 +64,11 @@ export function AppointmentForm({
       notes: "",
       meetLink: "",
     },
+  });
+  const settingsQuery = useQuery({
+    queryKey: ["professional-settings", user?.id],
+    queryFn: () => getProfessionalSettings(client, user!.id),
+    enabled: Boolean(user?.id),
   });
 
   useEffect(() => {
@@ -72,15 +102,58 @@ export function AppointmentForm({
         startAt: new Date(values.startAt).toISOString(),
         endAt: new Date(values.endAt).toISOString(),
       }),
-    onSuccess: (appointment) => {
+    onSuccess: async (appointment) => {
       setServerError(null);
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      if (settingsQuery.data?.googleCalendarConnected) {
+        const response = await fetch("/api/google-calendar/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointmentId: appointment.id }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          setServerError(payload.error ?? "La cita se guardó, pero no se pudo sincronizar con Google Calendar.");
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["appointments"] });
+        }
+      }
       onSaved?.(appointment);
     },
     onError: (error) => {
       setServerError(error instanceof Error ? error.message : "No se pudo guardar la cita.");
     },
   });
+
+  const watchedPatientId = form.watch("patientId");
+  const watchedStartAt = form.watch("startAt");
+  const watchedEndAt = form.watch("endAt");
+  const watchedReason = form.watch("reason");
+  const watchedModality = form.watch("modality");
+  const watchedMeetLink = form.watch("meetLink");
+  const selectedPatient = patients.find((patient) => patient.id === watchedPatientId) ?? null;
+  const googleCalendarUrl = useMemo(() => {
+    if (!watchedStartAt || !watchedEndAt || !watchedReason || !selectedPatient) return null;
+
+    const title = `${watchedReason} · ${selectedPatient.firstName} ${selectedPatient.lastName}`;
+    const details = [
+      `Paciente: ${selectedPatient.firstName} ${selectedPatient.lastName}`,
+      `Documento: ${selectedPatient.documentNumber}`,
+      `Modalidad: ${watchedModality}`,
+      watchedMeetLink ? `Teleconsulta: ${watchedMeetLink}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return buildGoogleCalendarUrl({
+      title,
+      details,
+      startAt: watchedStartAt,
+      endAt: watchedEndAt,
+      location: watchedModality === "virtual" ? watchedMeetLink || "Teleconsulta Axyscare" : undefined,
+    });
+  }, [watchedEndAt, watchedMeetLink, watchedModality, watchedReason, watchedStartAt, selectedPatient]);
 
   return (
     <form className="stack" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
@@ -133,6 +206,19 @@ export function AppointmentForm({
       <FormField label="Link de Meet">
         <input {...form.register("meetLink")} />
       </FormField>
+      {googleCalendarUrl ? (
+        <div className="info-panel">
+          <strong>Google Calendar</strong>
+          <span>
+            {settingsQuery.data?.googleCalendarConnected
+              ? "Tu cuenta ya está conectada. Al guardar la cita se sincronizará con Google Calendar y, si es virtual, Google podrá generar el enlace de Meet."
+              : "Con la fecha y hora actuales ya puedes generar el evento con recordatorio desde Google Calendar."}
+          </span>
+          <a href={googleCalendarUrl} target="_blank" rel="noreferrer" className="pill-link">
+            {settingsQuery.data?.googleCalendarConnected ? "Abrir en Google Calendar" : "Agregar a Google Calendar"}
+          </a>
+        </div>
+      ) : null}
       <FormField label="Notas">
         <textarea {...form.register("notes")} />
       </FormField>
@@ -143,4 +229,3 @@ export function AppointmentForm({
     </form>
   );
 }
-

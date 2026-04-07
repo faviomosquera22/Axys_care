@@ -29,11 +29,13 @@ Base clínica unificada para web y app móvil con `Next.js + Expo + Supabase`, o
 2. Instala dependencias:
    - `corepack pnpm install`
 3. Copia `.env.example` a `.env.local` y completa credenciales de Supabase.
+4. Si vas a usar Google Calendar, completa también `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `GOOGLE_REDIRECT_URI`.
 4. Levanta la web:
    - `corepack pnpm dev:web`
 5. Levanta la app móvil:
    - `corepack pnpm dev:mobile`
 6. Aplica migraciones de Supabase con la CLI o desde SQL Editor.
+7. Para sincronización automática de citas con Google Calendar, ejecuta `supabase/migrations/005_google_calendar_oauth.sql` y conecta la cuenta desde `Configuración`.
 
 ## Documentación clave
 
