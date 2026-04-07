@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { FormField } from "@/components/forms/form-ui";
+import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { useAuth } from "@/components/providers/providers";
 
 function formatGoogleCalendarDate(value: string) {
@@ -50,6 +50,7 @@ export function AppointmentForm({
   const { client, user } = useAuth();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const form = useForm<AppointmentInput>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
@@ -104,6 +105,7 @@ export function AppointmentForm({
       }),
     onSuccess: async (appointment) => {
       setServerError(null);
+      setSuccessMessage(initialAppointment ? "Cita actualizada correctamente." : "Cita creada correctamente.");
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       if (settingsQuery.data?.googleCalendarConnected) {
         const response = await fetch("/api/google-calendar/sync", {
@@ -115,13 +117,16 @@ export function AppointmentForm({
         if (!response.ok) {
           const payload = (await response.json()) as { error?: string };
           setServerError(payload.error ?? "La cita se guardó, pero no se pudo sincronizar con Google Calendar.");
+          setSuccessMessage("La cita se guardó, pero la sincronización con Google Calendar falló.");
         } else {
           queryClient.invalidateQueries({ queryKey: ["appointments"] });
+          setSuccessMessage("Cita guardada y sincronizada con Google Calendar.");
         }
       }
       onSaved?.(appointment);
     },
     onError: (error) => {
+      setSuccessMessage(null);
       setServerError(error instanceof Error ? error.message : "No se pudo guardar la cita.");
     },
   });
@@ -131,7 +136,6 @@ export function AppointmentForm({
   const watchedEndAt = form.watch("endAt");
   const watchedReason = form.watch("reason");
   const watchedModality = form.watch("modality");
-  const watchedMeetLink = form.watch("meetLink");
   const selectedPatient = patients.find((patient) => patient.id === watchedPatientId) ?? null;
   const googleCalendarUrl = useMemo(() => {
     if (!watchedStartAt || !watchedEndAt || !watchedReason || !selectedPatient) return null;
@@ -140,8 +144,8 @@ export function AppointmentForm({
     const details = [
       `Paciente: ${selectedPatient.firstName} ${selectedPatient.lastName}`,
       `Documento: ${selectedPatient.documentNumber}`,
+      selectedPatient.email ? `Correo del paciente: ${selectedPatient.email}` : "",
       `Modalidad: ${watchedModality}`,
-      watchedMeetLink ? `Teleconsulta: ${watchedMeetLink}` : "",
     ]
       .filter(Boolean)
       .join("\n");
@@ -151,9 +155,9 @@ export function AppointmentForm({
       details,
       startAt: watchedStartAt,
       endAt: watchedEndAt,
-      location: watchedModality === "virtual" ? watchedMeetLink || "Teleconsulta Axyscare" : undefined,
+      location: watchedModality === "virtual" ? "Teleconsulta Axyscare" : undefined,
     });
-  }, [watchedEndAt, watchedMeetLink, watchedModality, watchedReason, watchedStartAt, selectedPatient]);
+  }, [watchedEndAt, watchedModality, watchedReason, watchedStartAt, selectedPatient]);
 
   return (
     <form className="stack" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
@@ -203,15 +207,17 @@ export function AppointmentForm({
       <FormField label="Motivo" error={form.formState.errors.reason?.message}>
         <textarea {...form.register("reason")} />
       </FormField>
-      <FormField label="Link de Meet">
-        <input {...form.register("meetLink")} />
+      <FormField label="Correo del paciente">
+        <input value={selectedPatient?.email ?? ""} readOnly placeholder="El paciente no tiene correo registrado" />
       </FormField>
       {googleCalendarUrl ? (
         <div className="info-panel">
           <strong>Google Calendar</strong>
           <span>
             {settingsQuery.data?.googleCalendarConnected
-              ? "Tu cuenta ya está conectada. Al guardar la cita se sincronizará con Google Calendar y, si es virtual, Google podrá generar el enlace de Meet."
+              ? selectedPatient?.email
+                ? "Tu cuenta ya está conectada. Al guardar la cita se sincronizará con Google Calendar, el paciente irá como invitado y Google enviará la notificación a su correo."
+                : "Tu cuenta ya está conectada. La cita se sincronizará con Google Calendar, pero el paciente no recibirá invitación hasta que tenga un correo registrado."
               : "Con la fecha y hora actuales ya puedes generar el evento con recordatorio desde Google Calendar."}
           </span>
           <a href={googleCalendarUrl} target="_blank" rel="noreferrer" className="pill-link">
@@ -222,6 +228,7 @@ export function AppointmentForm({
       <FormField label="Notas">
         <textarea {...form.register("notes")} />
       </FormField>
+      {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
       <button className="btn" disabled={mutation.isPending}>
         {mutation.isPending ? "Guardando..." : initialAppointment ? "Actualizar cita" : "Crear cita"}

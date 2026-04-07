@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "medico" | "enfermeria" | "profesional_mixto";
+export type UserRole = "admin" | "medico" | "psicologo" | "enfermeria" | "profesional_mixto";
 
 export type AppointmentStatus =
   | "programada"
@@ -203,11 +203,25 @@ export interface Diagnosis extends TraceabilityFields {
   id?: string;
   ownerUserId?: string;
   encounterId: string;
-  source: "medical" | "nursing";
+  source: "medical_icd10" | "psychology_dsm5_ready" | "nursing_pae";
   code?: string | null;
   label: string;
   isPrimary: boolean;
   notes?: string | null;
+}
+
+export interface MedicationOrder extends TraceabilityFields {
+  id?: string;
+  ownerUserId?: string;
+  encounterId: string;
+  medicationName: string;
+  presentation?: string | null;
+  dosage?: string | null;
+  route?: string | null;
+  frequency?: string | null;
+  duration?: string | null;
+  instructions?: string | null;
+  prescriberRole: UserRole;
 }
 
 export interface Procedure extends TraceabilityFields {
@@ -261,7 +275,14 @@ export interface ClinicalNote extends TraceabilityFields {
   id?: string;
   ownerUserId?: string;
   encounterId: string;
-  noteKind: "general" | "evolution" | "nursing_followup" | "medical_followup";
+  noteKind:
+    | "general"
+    | "evolution"
+    | "nursing_followup"
+    | "medical_followup"
+    | "patient_indications"
+    | "nursing_care_plan"
+    | "psychology_plan";
   content: string;
 }
 

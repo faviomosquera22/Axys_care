@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { FormField } from "@/components/forms/form-ui";
+import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { useAuth } from "@/components/providers/providers";
 
 type PatientFormValues = PatientInput & { allergies: string[] };
@@ -23,6 +23,7 @@ export function PatientForm({
   const { client } = useAuth();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const form = useForm<PatientInput>({
     resolver: zodResolver(patientSchema) as any,
     defaultValues: {
@@ -82,6 +83,7 @@ export function PatientForm({
       }),
     onSuccess: (patient) => {
       setServerError(null);
+      setSuccessMessage(initialPatient ? "Paciente actualizado correctamente." : "Paciente creado correctamente.");
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       onSaved?.(patient);
       if (!initialPatient) {
@@ -89,6 +91,7 @@ export function PatientForm({
       }
     },
     onError: (error) => {
+      setSuccessMessage(null);
       setServerError(error instanceof Error ? error.message : "No se pudo guardar el paciente.");
     },
   });
@@ -139,6 +142,15 @@ export function PatientForm({
         <FormField label="Teléfono">
           <input {...form.register("phone")} />
         </FormField>
+        <FormField label="Correo del paciente" error={form.formState.errors.email?.message}>
+          <input type="email" placeholder="nombre@correo.com" {...form.register("email")} />
+        </FormField>
+      </div>
+      <div className="info-panel">
+        <strong>Correo para agenda y Google Calendar</strong>
+        <span>
+          Si el paciente tiene correo guardado, la agenda lo reflejará automáticamente y Google Calendar podrá enviarle la invitación.
+        </span>
       </div>
       <FormField label="Alergias (separadas por coma)">
         <input
@@ -154,6 +166,7 @@ export function PatientForm({
       <FormField label="Antecedentes relevantes">
         <textarea {...form.register("relevantHistory")} />
       </FormField>
+      {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
       <button className="btn" disabled={mutation.isPending}>
         {mutation.isPending ? "Guardando..." : initialPatient ? "Actualizar paciente" : "Crear paciente"}

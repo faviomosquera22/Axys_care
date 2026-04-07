@@ -1,6 +1,14 @@
 import { calculateBMI, calculateMAP } from "@axyscare/core-clinical";
 import { z } from "zod";
 
+const assetUrlSchema = z
+  .string()
+  .refine((value) => value === "" || value.startsWith("data:") || /^https?:\/\//.test(value), {
+    message: "Debe ser una URL válida o un archivo embebido.",
+  })
+  .optional()
+  .nullable();
+
 export const loginSchema = z.object({
   email: z.email(),
   password: z.string().min(8),
@@ -9,7 +17,7 @@ export const loginSchema = z.object({
 export const professionalProfileSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
-  role: z.enum(["admin", "medico", "enfermeria", "profesional_mixto"]),
+  role: z.enum(["admin", "medico", "psicologo", "enfermeria", "profesional_mixto"]),
   profession: z.string().min(2),
   specialty: z.string().optional().nullable(),
   professionalLicense: z.string().min(3),
@@ -18,10 +26,10 @@ export const professionalProfileSchema = z.object({
   professionalAddress: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   shortBio: z.string().max(500).optional().nullable(),
-  signatureUrl: z.string().url().optional().nullable(),
-  sealUrl: z.string().url().optional().nullable(),
-  logoUrl: z.string().url().optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable(),
+  signatureUrl: assetUrlSchema,
+  sealUrl: assetUrlSchema,
+  logoUrl: assetUrlSchema,
+  avatarUrl: assetUrlSchema,
 });
 
 export const patientSchema = z.object({
@@ -156,6 +164,18 @@ export const examOrderSchema = z.object({
   orderedAt: z.string().min(10),
 });
 
+export const medicationOrderSchema = z.object({
+  encounterId: z.string().uuid(),
+  medicationName: z.string().min(2),
+  presentation: z.string().optional().nullable(),
+  dosage: z.string().optional().nullable(),
+  route: z.string().optional().nullable(),
+  frequency: z.string().optional().nullable(),
+  duration: z.string().optional().nullable(),
+  instructions: z.string().optional().nullable(),
+  prescriberRole: z.enum(["medico", "profesional_mixto"]),
+});
+
 export const printSchema = z.object({
   encounterId: z.string().uuid(),
   includeMedicalSection: z.boolean().default(true),
@@ -184,4 +204,5 @@ export type EncounterInput = z.infer<typeof encounterSchema>;
 export type VitalSignsInput = z.infer<typeof vitalSignsSchema>;
 export type MedicalAssessmentInput = z.infer<typeof medicalAssessmentSchema>;
 export type NursingAssessmentInput = z.infer<typeof nursingAssessmentSchema>;
+export type MedicationOrderInput = z.infer<typeof medicationOrderSchema>;
 export type PatientShareInput = z.infer<typeof patientShareSchema>;

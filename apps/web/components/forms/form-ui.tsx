@@ -18,3 +18,12 @@ export function FormField({
   );
 }
 
+export function FormStatusMessage({
+  tone,
+  message,
+}: {
+  tone: "loading" | "success" | "error";
+  message: string;
+}) {
+  return <div className={`form-status form-status--${tone}`}>{message}</div>;
+}

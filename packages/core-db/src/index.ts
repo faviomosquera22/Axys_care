@@ -8,6 +8,7 @@ import type {
   Encounter,
   ExamOrder,
   ExamResult,
+  MedicationOrder,
   MedicalAssessment,
   NursingAssessment,
   Patient,
@@ -24,6 +25,7 @@ import type {
   AppointmentInput,
   EncounterInput,
   MedicalAssessmentInput,
+  MedicationOrderInput,
   NursingAssessmentInput,
   PatientInput,
   PatientShareInput,
@@ -71,6 +73,7 @@ export const patientRealtimeTables = [
   "exam_results",
   "clinical_notes",
   "attachments",
+  "medication_orders",
 ] as const;
 
 let browserClient: SupabaseClient | null = null;
@@ -611,6 +614,46 @@ export async function createExamOrder(
   return fromExamOrderRow(row, profiles);
 }
 
+export async function listMedicationOrders(client: SupabaseClient, encounterId?: string) {
+  let query = client.from("medication_orders").select("*").order("created_at", { ascending: false });
+  if (encounterId) query = query.eq("encounter_id", encounterId);
+  const rows = await unwrap(query);
+  const profiles = await getProfilesMap(
+    client,
+    (rows ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+  );
+  return (rows ?? []).map((row: any) => fromMedicationOrderRow(row, profiles));
+}
+
+export async function createMedicationOrder(client: SupabaseClient, input: MedicationOrderInput) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+  const encounterContext = await getEncounterContext(client, input.encounterId);
+
+  const row = await unwrap(
+    client
+      .from("medication_orders")
+      .insert({
+        owner_user_id: encounterContext.ownerUserId,
+        encounter_id: input.encounterId,
+        medication_name: input.medicationName,
+        presentation: input.presentation,
+        dosage: input.dosage,
+        route: input.route,
+        frequency: input.frequency,
+        duration: input.duration,
+        instructions: input.instructions,
+        prescriber_role: input.prescriberRole,
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      })
+      .select()
+      .single(),
+  );
+  const profiles = await getProfilesMap(client, [actorUserId]);
+  return fromMedicationOrderRow(row, profiles);
+}
+
 export async function listAttachments(
   client: SupabaseClient,
   filters?: { patientId?: string; encounterId?: string; examOrderId?: string },
@@ -968,7 +1011,7 @@ export function subscribeToPatientRealtime(
 }
 
 export async function getEncounterBundle(client: SupabaseClient, encounterId: string) {
-  const [encounter, vitals, medical, nursing, notes, diagnoses, procedures, examOrders, attachments] = await Promise.all([
+  const [encounter, vitals, medical, nursing, notes, diagnoses, procedures, examOrders, attachments, medicationOrders] = await Promise.all([
     unwrap(client.from("encounters").select("*").eq("id", encounterId).single()),
     unwrap(client.from("vital_signs").select("*").eq("encounter_id", encounterId).maybeSingle()),
     unwrap(client.from("medical_assessments").select("*").eq("encounter_id", encounterId).maybeSingle()),
@@ -978,6 +1021,7 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
     unwrap(client.from("procedures").select("*").eq("encounter_id", encounterId).order("performed_at", { ascending: false })),
     unwrap(client.from("exam_orders").select("*").eq("encounter_id", encounterId).order("ordered_at", { ascending: false })),
     unwrap(client.from("attachments").select("*").eq("encounter_id", encounterId).order("created_at", { ascending: false })),
+    unwrap(client.from("medication_orders").select("*").eq("encounter_id", encounterId).order("created_at", { ascending: false })),
   ]);
 
   const profiles = await getProfilesMap(
@@ -996,6 +1040,7 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
       ...(procedures ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
       ...(examOrders ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
       ...(attachments ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
+      ...(medicationOrders ?? []).flatMap((row: any) => [row.created_by, row.updated_by]),
     ].filter(Boolean) as string[],
   );
 
@@ -1009,6 +1054,7 @@ export async function getEncounterBundle(client: SupabaseClient, encounterId: st
     procedures: (procedures ?? []).map((row: any) => fromProcedureRow(row, profiles)),
     examOrders: (examOrders ?? []).map((row: any) => fromExamOrderRow(row, profiles)),
     attachments: (attachments ?? []).map((row: any) => fromAttachmentRow(row, profiles)),
+    medicationOrders: (medicationOrders ?? []).map((row: any) => fromMedicationOrderRow(row, profiles)),
   };
 }
 
@@ -1308,6 +1354,23 @@ function fromDiagnosisRow(row: any, profiles?: Map<string, Profile>): Diagnosis 
     label: row.label,
     isPrimary: row.is_primary,
     notes: row.notes,
+    ...mapTraceability(row, profiles),
+  };
+}
+
+function fromMedicationOrderRow(row: any, profiles?: Map<string, Profile>): MedicationOrder {
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    encounterId: row.encounter_id,
+    medicationName: row.medication_name,
+    presentation: row.presentation,
+    dosage: row.dosage,
+    route: row.route,
+    frequency: row.frequency,
+    duration: row.duration,
+    instructions: row.instructions,
+    prescriberRole: row.prescriber_role,
     ...mapTraceability(row, profiles),
   };
 }
