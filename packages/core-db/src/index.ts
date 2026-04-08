@@ -1128,6 +1128,40 @@ function toPatientRow(input: PatientInput) {
   };
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeEmergencyContact(value: unknown): Patient["emergencyContact"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  const relation = typeof row.relation === "string" ? row.relation.trim() : "";
+  const phone = typeof row.phone === "string" ? row.phone.trim() : "";
+
+  if (!name && !relation && !phone) {
+    return null;
+  }
+
+  return {
+    name,
+    relation,
+    phone,
+  };
+}
+
 function toAppointmentRow(input: AppointmentInput) {
   return {
     patient_id: input.patientId,
@@ -1226,9 +1260,9 @@ function fromPatientRow(
     address: row.address,
     phone: row.phone,
     email: row.email,
-    emergencyContact: row.emergency_contact,
+    emergencyContact: normalizeEmergencyContact(row.emergency_contact),
     bloodType: row.blood_type,
-    allergies: row.allergies ?? [],
+    allergies: normalizeStringArray(row.allergies),
     relevantHistory: row.relevant_history,
     insurance: row.insurance,
     ...mapTraceability(row),
