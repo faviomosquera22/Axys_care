@@ -19,13 +19,16 @@ import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 export default function PatientDetailPage() {
   const params = useParams<{ id: string }>();
   const { client } = useAuth();
+  const patientId = Array.isArray(params.id) ? params.id[0] : params.id;
   const patientQuery = useQuery({
-    queryKey: ["patient", params.id],
-    queryFn: () => getPatient(client, params.id),
+    queryKey: ["patient", patientId],
+    queryFn: () => getPatient(client, patientId!),
+    enabled: Boolean(patientId),
   });
   const encountersQuery = useQuery({
-    queryKey: ["encounters", params.id],
-    queryFn: () => listEncounters(client, params.id),
+    queryKey: ["encounters", patientId],
+    queryFn: () => listEncounters(client, patientId!),
+    enabled: Boolean(patientId),
   });
   const ownerProfileQuery = useQuery({
     queryKey: ["profile", "owner", patientQuery.data?.ownerUserId],
@@ -33,14 +36,15 @@ export default function PatientDetailPage() {
     enabled: Boolean(patientQuery.data?.ownerUserId),
   });
   const accessQuery = useQuery({
-    queryKey: ["patient-access", params.id],
-    queryFn: () => listPatientAccess(client, params.id),
+    queryKey: ["patient-access", patientId],
+    queryFn: () => listPatientAccess(client, patientId!),
+    enabled: Boolean(patientId),
   });
 
-  usePatientRealtime(params.id, [
-    ["patient", params.id],
-    ["encounters", params.id],
-    ["patient-access", params.id],
+  usePatientRealtime(patientId, [
+    ["patient", patientId],
+    ["encounters", patientId],
+    ["patient-access", patientId],
   ]);
 
   const patient = patientQuery.data;
@@ -58,8 +62,59 @@ export default function PatientDetailPage() {
     ? `${ownerProfileQuery.data.firstName} ${ownerProfileQuery.data.lastName}`.trim()
     : patient?.ownerUserId;
 
-  if (!patient) {
+  if (!patientId) {
+    return (
+      <Card>
+        <SectionHeading
+          title="Ruta de paciente no válida"
+          description="La ficha recibió un identificador inválido. Vuelve al listado y abre el paciente nuevamente."
+        />
+        <div className="btn-row">
+          <Link href="/pacientes" className="btn">
+            Volver a pacientes
+          </Link>
+        </div>
+      </Card>
+    );
+  }
+
+  if (patientQuery.isPending) {
     return <div className="ax-card">Cargando paciente...</div>;
+  }
+
+  if (patientQuery.error || !patient) {
+    const message =
+      patientQuery.error instanceof Error
+        ? patientQuery.error.message
+        : "No se pudo cargar la ficha del paciente.";
+
+    return (
+      <Card>
+        <SectionHeading
+          title="No se pudo abrir la ficha"
+          description="La navegación llegó a la ruta correcta, pero la ficha no pudo recuperar el contexto clínico del paciente."
+        />
+        <div className="empty-state">
+          <strong>{message}</strong>
+          <p>
+            Revisa si el paciente sigue disponible para tu usuario o vuelve al
+            listado para intentar abrirlo otra vez.
+          </p>
+        </div>
+        <div className="btn-row">
+          <Link href="/pacientes" className="btn">
+            Volver a pacientes
+          </Link>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => patientQuery.refetch()}
+          >
+            Reintentar
+          </button>
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -107,11 +162,11 @@ export default function PatientDetailPage() {
           </div>
           <div className="clinical-hero__metric">
             <span>Encuentros</span>
-            <strong>{encounters.length}</strong>
+            <strong>{encountersQuery.isError ? "Error" : encounters.length}</strong>
           </div>
           <div className="clinical-hero__metric">
             <span>Colaboradores</span>
-            <strong>{activeCollaborators}</strong>
+            <strong>{accessQuery.isError ? "Error" : activeCollaborators}</strong>
           </div>
           <div className="clinical-hero__metric">
             <span>Última atención</span>
@@ -389,6 +444,16 @@ export default function PatientDetailPage() {
               title="Línea de tiempo clínica"
               description="Cada encuentro conserva su autor, tipo, estado y siguiente acción sugerida."
             />
+            {encountersQuery.error ? (
+              <div className="empty-state">
+                <strong>No se pudo cargar la línea de tiempo.</strong>
+                <p>
+                  {encountersQuery.error instanceof Error
+                    ? encountersQuery.error.message
+                    : "Error recuperando los encounters del paciente."}
+                </p>
+              </div>
+            ) : null}
             {encounters.length ? (
               encounters.map((encounter) => (
                 <div key={encounter.id} className="timeline-entry">
@@ -479,7 +544,11 @@ export default function PatientDetailPage() {
             </div>
             <div className="meta-strip">
               <strong>Colaboradores</strong>
-              <span>{activeCollaborators} con acceso activo</span>
+              <span>
+                {accessQuery.isError
+                  ? "No disponible por error de carga"
+                  : `${activeCollaborators} con acceso activo`}
+              </span>
             </div>
             <div className="btn-row">
               <Link href="/agenda" className="pill-link">
@@ -491,10 +560,30 @@ export default function PatientDetailPage() {
             </div>
           </Card>
 
-          <PatientSharePanel
-            patientId={patient.id}
-            ownerUserId={patient.ownerUserId}
-          />
+          {accessQuery.isError ? (
+            <Card>
+              <SectionHeading
+                title="Colaboración clínica no disponible"
+                description="La ficha pudo abrirse, pero el panel de colaboración no logró cargar."
+              />
+              <div className="empty-state">
+                <strong>
+                  {accessQuery.error instanceof Error
+                    ? accessQuery.error.message
+                    : "No se pudo cargar el panel de acceso compartido."}
+                </strong>
+                <p>
+                  Puedes seguir usando la ficha y reintentar más tarde sin perder
+                  el contexto clínico del paciente.
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <PatientSharePanel
+              patientId={patient.id}
+              ownerUserId={patient.ownerUserId}
+            />
+          )}
         </aside>
       </div>
     </div>
