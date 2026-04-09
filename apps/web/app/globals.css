@@ -23,10 +23,19 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   background:
-    radial-gradient(circle at top left, rgba(21, 102, 105, 0.08), transparent 36%),
-    radial-gradient(circle at bottom right, rgba(176, 86, 39, 0.12), transparent 28%),
+    radial-gradient(
+      circle at top left,
+      rgba(21, 102, 105, 0.08),
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(176, 86, 39, 0.12),
+      transparent 28%
+    ),
     linear-gradient(180deg, #f9f4ea 0%, #f0e8db 100%);
   color: var(--foreground);
 }
@@ -478,6 +487,48 @@ button {
   color: var(--danger);
 }
 
+.loading-state-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 112px;
+}
+
+.loading-state-card__pulse {
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  flex: 0 0 auto;
+  background: linear-gradient(
+    135deg,
+    rgba(21, 102, 105, 0.24),
+    rgba(21, 102, 105, 0.08)
+  );
+  animation: ax-pulse 1.6s ease-in-out infinite;
+}
+
+.loading-state-card__body {
+  display: grid;
+  gap: 6px;
+}
+
+.loading-state-card__body p {
+  margin: 0;
+  color: var(--muted);
+}
+
+@keyframes ax-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .auth-shell {
   min-height: 100vh;
   display: grid;
@@ -514,7 +565,11 @@ button {
 .workflow-banner,
 .patient-hub {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(243, 234, 220, 0.94)),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(243, 234, 220, 0.94)
+    ),
     var(--panel);
 }
 
@@ -579,9 +634,94 @@ button {
   border-radius: 28px;
   border: 1px solid rgba(12, 64, 99, 0.1);
   background:
-    linear-gradient(135deg, rgba(237, 247, 255, 0.96), rgba(247, 251, 255, 0.84)),
+    linear-gradient(
+      135deg,
+      rgba(237, 247, 255, 0.96),
+      rgba(247, 251, 255, 0.84)
+    ),
     var(--panel);
   box-shadow: var(--shadow);
+}
+
+.clinical-context-banner {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(12, 64, 99, 0.12);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(239, 247, 252, 0.9)
+    ),
+    var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.clinical-context-banner--sticky {
+  position: sticky;
+  top: 144px;
+  z-index: 15;
+}
+
+.clinical-context-banner__top,
+.clinical-context-banner__actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.clinical-context-banner__identity {
+  min-width: 0;
+}
+
+.clinical-context-banner__title {
+  margin: 4px 0 8px;
+  font-size: 1.6rem;
+}
+
+.clinical-context-banner__subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.clinical-context-banner__badges,
+.clinical-context-banner__inline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clinical-context-banner__inline-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.clinical-context-banner__grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.clinical-context-banner__item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.clinical-context-banner__item span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.clinical-context-banner__item strong {
+  font-size: 0.96rem;
+  overflow-wrap: anywhere;
 }
 
 .clinical-hero__primary {
@@ -663,6 +803,93 @@ button {
   min-width: 0;
 }
 
+.history-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+}
+
+.history-filter-chip.active {
+  border-color: rgba(21, 102, 105, 0.28);
+  background: rgba(21, 102, 105, 0.1);
+  color: var(--foreground);
+}
+
+.patient-spotlight {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(237, 247, 255, 0.96),
+      rgba(255, 252, 248, 0.88)
+    ),
+    var(--panel);
+}
+
+.patient-spotlight__grid,
+.patient-alert-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.patient-spotlight__grid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.8fr);
+  align-items: start;
+}
+
+.patient-spotlight__primary {
+  display: grid;
+  gap: 12px;
+}
+
+.patient-spotlight__primary h2 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+
+.patient-spotlight__primary p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.patient-spotlight__stats {
+  display: grid;
+  gap: 12px;
+}
+
+.patient-spotlight__stat {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.patient-spotlight__stat span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.patient-spotlight__stat strong {
+  font-size: 1rem;
+}
+
+.patient-alert-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .patient-directory {
   display: grid;
   gap: 0;
@@ -671,7 +898,9 @@ button {
 .patient-directory__head,
 .patient-directory__row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.3fr) 96px minmax(220px, 1.25fr) minmax(140px, 0.9fr) 110px minmax(220px, 1.1fr);
+  grid-template-columns:
+    minmax(220px, 1.3fr) 96px minmax(220px, 1.25fr) minmax(140px, 0.9fr)
+    110px minmax(220px, 1.1fr);
   gap: 14px;
   align-items: center;
 }
@@ -758,6 +987,12 @@ button {
   border-color: rgba(176, 86, 39, 0.2);
   background: rgba(176, 86, 39, 0.1);
   color: var(--warm);
+}
+
+.action-pill--share {
+  border-color: rgba(53, 87, 168, 0.22);
+  background: rgba(53, 87, 168, 0.1);
+  color: #3557a8;
 }
 
 .patient-tabbar--hero {
@@ -896,6 +1131,30 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.history-timeline-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-timeline-card:last-child {
+  border-bottom: none;
+}
+
+.history-timeline-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.history-timeline-card__top p,
+.history-timeline-card span {
+  margin: 0;
+  color: var(--muted);
 }
 
 .patient-glance {
@@ -1084,9 +1343,12 @@ button {
   }
 
   .stats-grid,
+  .clinical-context-banner__grid,
   .clinical-hero__metrics,
   .clinical-summary-grid,
   .clinical-layout,
+  .patient-spotlight__grid,
+  .patient-alert-grid,
   .history-station,
   .two-column,
   .form-grid,
@@ -1110,6 +1372,9 @@ button {
   }
 
   .clinical-hero__primary,
+  .clinical-context-banner__top,
+  .clinical-context-banner__actions,
+  .history-timeline-card__top,
   .patient-hub__intro,
   .timeline-entry__top {
     flex-direction: column;

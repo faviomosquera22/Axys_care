@@ -1,11 +1,11 @@
 "use client";
 
-import { calculateAge } from "@axyscare/core-clinical";
 import { getPatient, getProfile, listPatients } from "@axyscare/core-db";
 import { Card } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
 import { EncounterWorkspace } from "@/components/forms/encounter-workspace";
 import { useAuth } from "@/components/providers/providers";
 
@@ -37,7 +37,9 @@ export default function NewEncounterPage() {
             <span className="patient-kicker">Consulta clínica</span>
             <h1 className="clinical-hero__title">Nueva atención</h1>
             <p className="clinical-hero__subtitle">
-              {encounterId ? "Continuación del encounter clínico existente." : "Flujo guiado desde el paciente hasta el cierre clínico del encuentro."}
+              {encounterId
+                ? "Continuación del encounter clínico existente."
+                : "Flujo guiado desde el paciente hasta el cierre clínico del encuentro."}
             </p>
           </div>
           <div className="clinical-hero__actions">
@@ -47,7 +49,11 @@ export default function NewEncounterPage() {
             <Link href="/historia-clinica" className="btn secondary">
               Ver historia
             </Link>
-            <button type="button" className="btn secondary" onClick={() => window.print()}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => window.print()}
+            >
               Imprimir vista
             </button>
           </div>
@@ -56,10 +62,20 @@ export default function NewEncounterPage() {
           <Link href="/nueva-atencion" className="patient-tabbar__link active">
             Nueva atención
           </Link>
-          <Link href={patientId ? `/historia-clinica?patientId=${patientId}` : "/historia-clinica"} className="patient-tabbar__link">
+          <Link
+            href={
+              patientId
+                ? `/historia-clinica?patientId=${patientId}`
+                : "/historia-clinica"
+            }
+            className="patient-tabbar__link"
+          >
             Historia clínica
           </Link>
-          <Link href={patientId ? `/pacientes/${patientId}` : "/pacientes"} className="patient-tabbar__link">
+          <Link
+            href={patientId ? `/pacientes/${patientId}` : "/pacientes"}
+            className="patient-tabbar__link"
+          >
             Ficha del paciente
           </Link>
           <Link href="/documentos" className="patient-tabbar__link">
@@ -74,28 +90,24 @@ export default function NewEncounterPage() {
         </div>
         <div className="workflow-banner__step">
           <strong>2. Registrar atención</strong>
-          <span>Signos vitales, nota médica o enfermería, procedimientos y notas.</span>
+          <span>
+            Signos vitales, nota médica o enfermería, procedimientos y notas.
+          </span>
         </div>
         <div className="workflow-banner__step">
           <strong>3. Cerrar resumen</strong>
           <span>Revisar trazabilidad y descargar el PDF del episodio.</span>
         </div>
       </Card>
-      {patientQuery.data ? (
-        <Card className="patient-glance">
-          <div>
-            <strong>
-              {patientQuery.data.firstName} {patientQuery.data.lastName}
-            </strong>
-            <p>
-              {patientQuery.data.documentType} {patientQuery.data.documentNumber} · {calculateAge(patientQuery.data.birthDate)} años
-            </p>
-          </div>
-          <div className="patient-glance__meta">
-            <span>Alergias: {patientQuery.data.allergies?.join(", ") || "No registradas"}</span>
-            <span>Antecedentes: {patientQuery.data.relevantHistory || "Sin antecedentes cargados"}</span>
-          </div>
-        </Card>
+      {patientQuery.data && !encounterId ? (
+        <ClinicalContextBanner
+          patient={patientQuery.data}
+          stageLabel="Preparando apertura del encuentro"
+          lastSavedAt={
+            patientQuery.data.updatedAt ?? patientQuery.data.createdAt
+          }
+          sticky={false}
+        />
       ) : null}
       <EncounterWorkspace
         patients={patientsQuery.data ?? []}

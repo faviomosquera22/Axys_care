@@ -1,6 +1,7 @@
 "use client";
 
 import { isSupabaseConfigured } from "@axyscare/core-db";
+import { LoadingStateCard } from "@axyscare/ui-shared";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -17,9 +18,15 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   }, [loading, router, user]);
 
   if (loading) {
-    return <div className="auth-shell">Cargando sesión...</div>;
+    return (
+      <div className="auth-shell">
+        <LoadingStateCard
+          title="Cargando sesión clínica"
+          description="Estamos validando tu acceso y restaurando el contexto de trabajo."
+        />
+      </div>
+    );
   }
 
   return <AppShell>{children}</AppShell>;
 }
-

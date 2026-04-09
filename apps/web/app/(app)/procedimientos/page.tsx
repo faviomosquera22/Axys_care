@@ -1,7 +1,16 @@
 "use client";
 
-import { getEncounterBundle, listEncounters, listPatients } from "@axyscare/core-db";
-import { Card, SectionHeading } from "@axyscare/ui-shared";
+import {
+  getEncounterBundle,
+  listEncounters,
+  listPatients,
+} from "@axyscare/core-db";
+import {
+  Card,
+  EmptyStatePanel,
+  LoadingStateCard,
+  SectionHeading,
+} from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -28,7 +37,11 @@ export default function ProceduresPage() {
 
   useEffect(() => {
     const nextEncounterId = encountersQuery.data?.[0]?.id ?? "";
-    setSelectedEncounterId((current) => (current && encountersQuery.data?.some((item) => item.id === current) ? current : nextEncounterId));
+    setSelectedEncounterId((current) =>
+      current && encountersQuery.data?.some((item) => item.id === current)
+        ? current
+        : nextEncounterId,
+    );
   }, [encountersQuery.data]);
 
   const bundle = bundleQuery.data;
@@ -38,16 +51,25 @@ export default function ProceduresPage() {
       <div className="topbar">
         <div>
           <h1>Procedimientos</h1>
-          <p>Subcategoría clínica del encounter. Esta vista sirve para revisar y localizar procedimientos ya registrados.</p>
+          <p>
+            Subcategoría clínica del encounter. Esta vista sirve para revisar y
+            localizar procedimientos ya registrados.
+          </p>
         </div>
       </div>
 
       <Card>
-        <SectionHeading title="Filtrar por paciente" description="Selecciona un paciente y revisa los procedimientos por episodio." />
+        <SectionHeading
+          title="Filtrar por paciente"
+          description="Selecciona un paciente y revisa los procedimientos por episodio."
+        />
         <div className="form-grid">
           <div className="form-field">
             <span>Paciente</span>
-            <select value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}>
+            <select
+              value={selectedPatientId}
+              onChange={(event) => setSelectedPatientId(event.target.value)}
+            >
               <option value="">Selecciona</option>
               {(patientsQuery.data ?? []).map((patient) => (
                 <option key={patient.id} value={patient.id}>
@@ -61,8 +83,16 @@ export default function ProceduresPage() {
 
       <div className="workspace-grid">
         <Card>
-          <SectionHeading title="Encuentros del paciente" description="Abre el episodio donde se registró el procedimiento." />
-          {(encountersQuery.data ?? []).length ? (
+          <SectionHeading
+            title="Encuentros del paciente"
+            description="Abre el episodio donde se registró el procedimiento."
+          />
+          {encountersQuery.isPending ? (
+            <LoadingStateCard
+              title="Cargando encounters del paciente"
+              description="Estamos buscando los episodios clínicos asociados para localizar procedimientos registrados."
+            />
+          ) : (encountersQuery.data ?? []).length ? (
             (encountersQuery.data ?? []).map((encounter) => (
               <button
                 key={encounter.id}
@@ -70,50 +100,90 @@ export default function ProceduresPage() {
                 className={`picker-row ${selectedEncounterId === encounter.id ? "selected" : ""}`}
                 onClick={() => setSelectedEncounterId(encounter.id)}
               >
-                <strong>{new Date(encounter.startedAt).toLocaleString()}</strong>
-                <span>{encounter.chiefComplaint ?? "Sin motivo registrado"}</span>
+                <strong>
+                  {new Date(encounter.startedAt).toLocaleString()}
+                </strong>
+                <span>
+                  {encounter.chiefComplaint ?? "Sin motivo registrado"}
+                </span>
                 <span>{encounter.createdByName ?? "Sin autor"}</span>
               </button>
             ))
           ) : (
-            <div className="empty-state">
-              <strong>No hay encounters disponibles.</strong>
-              <p>Los procedimientos se registran dentro de la atención y luego aparecen aquí.</p>
-            </div>
+            <EmptyStatePanel
+              title="No hay encounters disponibles."
+              description="Los procedimientos se registran dentro de la atención y luego aparecen aquí como parte del mismo episodio."
+              action={
+                <Link href="/nueva-atencion" className="pill-link">
+                  Abrir Nueva atención
+                </Link>
+              }
+            />
           )}
         </Card>
 
         <Card className="workspace-aside">
-          <SectionHeading title="Edición" description="Agrega o corrige procedimientos dentro del mismo encounter." />
+          <SectionHeading
+            title="Edición"
+            description="Agrega o corrige procedimientos dentro del mismo encounter."
+          />
           {selectedEncounterId ? (
-            <Link href={`/nueva-atencion?encounterId=${selectedEncounterId}`} className="btn">
+            <Link
+              href={`/nueva-atencion?encounterId=${selectedEncounterId}`}
+              className="btn"
+            >
               Continuar encuentro
             </Link>
           ) : null}
         </Card>
       </div>
 
-      {bundle ? (
+      {bundleQuery.isPending ? (
+        <LoadingStateCard
+          title="Cargando procedimientos del encounter"
+          description="Estamos trayendo el detalle del episodio para mostrar resultados, materiales y trazabilidad."
+        />
+      ) : bundle ? (
         <Card>
-          <SectionHeading title="Procedimientos del encounter" description="Materiales, resultados y trazabilidad del procedimiento." />
+          <SectionHeading
+            title="Procedimientos del encounter"
+            description="Materiales, resultados y trazabilidad del procedimiento."
+          />
           {bundle.procedures.length ? (
             <div className="stack">
               {bundle.procedures.map((procedure) => (
                 <div key={procedure.id} className="trace-row">
                   <strong>{procedure.name}</strong>
-                  <p>{procedure.result ?? procedure.notes ?? "Sin observaciones."}</p>
+                  <p>
+                    {procedure.result ??
+                      procedure.notes ??
+                      "Sin observaciones."}
+                  </p>
                   <span>
-                    {procedure.responsibleProfessional ?? procedure.createdByName ?? "Sin responsable"} ·{" "}
-                    {procedure.performedAt ? new Date(procedure.performedAt).toLocaleString() : "sin fecha"}
+                    {procedure.responsibleProfessional ??
+                      procedure.createdByName ??
+                      "Sin responsable"}{" "}
+                    ·{" "}
+                    {procedure.performedAt
+                      ? new Date(procedure.performedAt).toLocaleString()
+                      : "sin fecha"}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state">
-              <strong>Este encounter no tiene procedimientos registrados.</strong>
-              <p>Agrega uno desde Nueva atención y aparecerá aquí y en la historia clínica.</p>
-            </div>
+            <EmptyStatePanel
+              title="Este encounter no tiene procedimientos registrados."
+              description="Agrega un procedimiento desde Nueva atención y aparecerá aquí junto con su resultado y responsable."
+              action={
+                <Link
+                  href={`/nueva-atencion?encounterId=${selectedEncounterId}`}
+                  className="pill-link"
+                >
+                  Registrar procedimiento
+                </Link>
+              }
+            />
           )}
         </Card>
       ) : null}

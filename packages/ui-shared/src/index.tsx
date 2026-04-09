@@ -1,7 +1,10 @@
 import clsx from "clsx";
 import type { PropsWithChildren, ReactNode } from "react";
 
-export function Card({ children, className }: PropsWithChildren<{ className?: string }>) {
+export function Card({
+  children,
+  className,
+}: PropsWithChildren<{ className?: string }>) {
   return <div className={clsx("ax-card", className)}>{children}</div>;
 }
 
@@ -53,3 +56,38 @@ export function MetricCard({
   );
 }
 
+export function EmptyStatePanel({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="empty-state">
+      <strong>{title}</strong>
+      <p>{description}</p>
+      {action ? <div>{action}</div> : null}
+    </div>
+  );
+}
+
+export function LoadingStateCard({
+  title = "Cargando contexto clínico",
+  description = "Estamos trayendo la información necesaria para que continúes sin perder el hilo del expediente.",
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <Card className="loading-state-card">
+      <div className="loading-state-card__pulse" />
+      <div className="loading-state-card__body">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+    </Card>
+  );
+}

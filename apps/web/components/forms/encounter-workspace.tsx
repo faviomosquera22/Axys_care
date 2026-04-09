@@ -8,7 +8,14 @@ import {
   medicationCatalog,
   psychologyCatalog,
 } from "@axyscare/core-catalogs";
-import type { Encounter, EncounterKind, Patient, Procedure, Profile, UserRole } from "@axyscare/core-types";
+import type {
+  Encounter,
+  EncounterKind,
+  Patient,
+  Procedure,
+  Profile,
+  UserRole,
+} from "@axyscare/core-types";
 import {
   createAttachmentRecord,
   createDiagnosis,
@@ -33,15 +40,52 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
+import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { EncounterSummaryDocument } from "@/components/pdf/encounter-summary-document";
 import { useAuth } from "@/components/providers/providers";
 import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
-type EncounterStage = "open" | "vitals" | "assessment" | "records" | "treatment" | "summary";
+type EncounterStage =
+  | "open"
+  | "vitals"
+  | "assessment"
+  | "records"
+  | "treatment"
+  | "summary";
+
+const encounterStageMeta: Record<
+  EncounterStage,
+  { title: string; description: string }
+> = {
+  open: {
+    title: "Preparación",
+    description: "Aún no se ha abierto el encounter.",
+  },
+  vitals: {
+    title: "Signos vitales",
+    description: "Captura inicial del estado del paciente.",
+  },
+  assessment: {
+    title: "Valoración clínica",
+    description: "Juicio clínico y observaciones principales.",
+  },
+  records: {
+    title: "Diagnósticos y notas",
+    description: "Registro clínico y trazabilidad del episodio.",
+  },
+  treatment: {
+    title: "Tratamiento e indicaciones",
+    description: "Prescripción, cuidados y plan al paciente.",
+  },
+  summary: {
+    title: "Resumen e impresión",
+    description: "Cierre operativo y lectura final del episodio.",
+  },
+};
 
 function normalizeSearch(value: string) {
   return value.trim().toLowerCase();
@@ -74,7 +118,8 @@ function TraceBlock({
     <div className="meta-strip">
       <strong>{label}</strong>
       <span>
-        {author ?? "Sin autor"} · {date ? new Date(date).toLocaleString() : "sin fecha"}
+        {author ?? "Sin autor"} ·{" "}
+        {date ? new Date(date).toLocaleString() : "sin fecha"}
       </span>
     </div>
   );
@@ -106,13 +151,7 @@ function StageButton({
   );
 }
 
-function ProgressItem({
-  label,
-  done,
-}: {
-  label: string;
-  done: boolean;
-}) {
+function ProgressItem({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="progress-item">
       <span className={`progress-item__dot ${done ? "done" : ""}`} />
@@ -137,9 +176,12 @@ export function EncounterWorkspace({
     setValueAs: (value: string) => (value === "" ? undefined : Number(value)),
   };
   const queryClient = useQueryClient();
-  const [activeEncounter, setActiveEncounter] = useState<Encounter | null>(null);
+  const [activeEncounter, setActiveEncounter] = useState<Encounter | null>(
+    null,
+  );
   const [activeStage, setActiveStage] = useState<EncounterStage>("open");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{
     tone: "loading" | "success" | "error";
     message: string;
@@ -182,7 +224,9 @@ export function EncounterWorkspace({
     mimeType: "image/png",
     path: "",
   });
-  const [procedureDraft, setProcedureDraft] = useState<Pick<Procedure, "name" | "result" | "notes">>({
+  const [procedureDraft, setProcedureDraft] = useState<
+    Pick<Procedure, "name" | "result" | "notes">
+  >({
     name: "",
     result: "",
     notes: "",
@@ -245,9 +289,12 @@ export function EncounterWorkspace({
   });
 
   const selectedPatient = patients.find(
-    (patient) => patient.id === (activeEncounter?.patientId ?? encounterForm.watch("patientId")),
+    (patient) =>
+      patient.id ===
+      (activeEncounter?.patientId ?? encounterForm.watch("patientId")),
   );
-  const selectedEncounterType = (activeEncounter?.encounterType ?? encounterForm.watch("encounterType")) as EncounterKind;
+  const selectedEncounterType = (activeEncounter?.encounterType ??
+    encounterForm.watch("encounterType")) as EncounterKind;
   const initialEncounterQuery = useQuery({
     queryKey: ["encounter", initialEncounterId],
     queryFn: () => getEncounter(client, initialEncounterId!),
@@ -269,6 +316,11 @@ export function EncounterWorkspace({
   useEffect(() => {
     if (activeEncounter || !initialEncounterQuery.data) return;
     setActiveEncounter(initialEncounterQuery.data);
+    setLastSavedAt(
+      initialEncounterQuery.data.updatedAt ??
+        initialEncounterQuery.data.createdAt ??
+        initialEncounterQuery.data.startedAt,
+    );
   }, [activeEncounter, initialEncounterQuery.data]);
 
   useEffect(() => {
@@ -276,7 +328,10 @@ export function EncounterWorkspace({
     vitalsForm.setValue("encounterId", activeEncounter.id);
     vitalsForm.setValue("patientId", activeEncounter.patientId);
     medicalForm.setValue("encounterId", activeEncounter.id);
-    medicalForm.setValue("chiefComplaint", activeEncounter.chiefComplaint ?? "");
+    medicalForm.setValue(
+      "chiefComplaint",
+      activeEncounter.chiefComplaint ?? "",
+    );
     nursingForm.setValue("encounterId", activeEncounter.id);
     if (activeStage === "open") {
       setActiveStage("vitals");
@@ -348,12 +403,23 @@ export function EncounterWorkspace({
       }),
     onSuccess: (encounter) => {
       setServerError(null);
-      setActionFeedback({ tone: "success", message: "Encuentro abierto correctamente." });
+      setActionFeedback({
+        tone: "success",
+        message: "Encuentro abierto correctamente.",
+      });
       setActiveEncounter(encounter);
-      queryClient.invalidateQueries({ queryKey: ["encounters", encounter.patientId] });
+      setLastSavedAt(
+        encounter.updatedAt ?? encounter.createdAt ?? encounter.startedAt,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["encounters", encounter.patientId],
+      });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : "No se pudo abrir el encuentro.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo abrir el encuentro.";
       setServerError(message);
       setActionFeedback({ tone: "error", message });
     },
@@ -383,11 +449,14 @@ export function EncounterWorkspace({
     : [];
 
   const bundle = encounterBundleQuery.data;
-  const supportsMedical = selectedEncounterType === "medical" || selectedEncounterType === "mixed";
-  const supportsNursing = selectedEncounterType === "nursing" || selectedEncounterType === "mixed";
+  const supportsMedical =
+    selectedEncounterType === "medical" || selectedEncounterType === "mixed";
+  const supportsNursing =
+    selectedEncounterType === "nursing" || selectedEncounterType === "mixed";
   const activeRole = professional?.role ?? "medico";
   const diagnosisSource = inferDiagnosisSource(activeRole);
-  const canPrescribeMedication = activeRole === "medico" || activeRole === "profesional_mixto";
+  const canPrescribeMedication =
+    activeRole === "medico" || activeRole === "profesional_mixto";
   const diagnosisCatalog = useMemo(() => {
     if (activeRole === "enfermeria") {
       return internalNursingSuggestionCatalog.map((item) => ({
@@ -415,60 +484,183 @@ export function EncounterWorkspace({
     const search = normalizeSearch(diagnosisSearch);
     if (!search) return diagnosisCatalog.slice(0, 12);
     return diagnosisCatalog
-      .filter((item) => normalizeSearch(`${item.code} ${item.label} ${item.meta}`).includes(search))
+      .filter((item) =>
+        normalizeSearch(`${item.code} ${item.label} ${item.meta}`).includes(
+          search,
+        ),
+      )
       .slice(0, 12);
   }, [diagnosisCatalog, diagnosisSearch]);
   const filteredExamCatalog = useMemo(() => {
     const search = normalizeSearch(examDraft.examName);
     return examCatalog
       .filter((item) => item.category === examDraft.category)
-      .filter((item) => !search || normalizeSearch(`${item.label} ${item.panel ?? ""}`).includes(search))
+      .filter(
+        (item) =>
+          !search ||
+          normalizeSearch(`${item.label} ${item.panel ?? ""}`).includes(search),
+      )
       .slice(0, 14);
   }, [examDraft.category, examDraft.examName]);
   const filteredMedicationCatalog = useMemo(() => {
     const search = normalizeSearch(medicationDraft.medicationName);
     return medicationCatalog
-      .filter((item) =>
-        !search || normalizeSearch(`${item.name} ${item.presentation} ${item.commonDose ?? ""}`).includes(search),
+      .filter(
+        (item) =>
+          !search ||
+          normalizeSearch(
+            `${item.name} ${item.presentation} ${item.commonDose ?? ""}`,
+          ).includes(search),
       )
       .slice(0, 10);
   }, [medicationDraft.medicationName]);
   const encounterAuthor =
     activeEncounter?.createdByName ??
-    (professional ? `${professional.firstName} ${professional.lastName}`.trim() : "Sin autor");
+    (professional
+      ? `${professional.firstName} ${professional.lastName}`.trim()
+      : "Sin autor");
   const progress = {
     encounter: Boolean(activeEncounter),
     vitals: Boolean(bundle?.vitals),
     medical: Boolean(bundle?.medical),
     nursing: Boolean(bundle?.nursing),
-    records: Boolean((bundle?.diagnoses?.length ?? 0) || (bundle?.notes?.length ?? 0) || (bundle?.procedures?.length ?? 0)),
+    records: Boolean(
+      (bundle?.diagnoses?.length ?? 0) ||
+      (bundle?.notes?.length ?? 0) ||
+      (bundle?.procedures?.length ?? 0),
+    ),
     treatment: Boolean(
       (bundle?.medicationOrders?.length ?? 0) ||
-        (bundle?.notes ?? []).some((note) =>
-          ["patient_indications", "nursing_care_plan", "psychology_plan"].includes(note.noteKind),
-        ),
+      (bundle?.notes ?? []).some((note) =>
+        [
+          "patient_indications",
+          "nursing_care_plan",
+          "psychology_plan",
+        ].includes(note.noteKind),
+      ),
     ),
   };
+  const completedBlocks = Object.values(progress).filter(Boolean).length;
+  const totalBlocks = Object.keys(progress).length;
+  const currentStageMeta = encounterStageMeta[activeStage];
+  const hasPendingChanges = Boolean(
+    encounterForm.formState.isDirty ||
+    vitalsForm.formState.isDirty ||
+    medicalForm.formState.isDirty ||
+    nursingForm.formState.isDirty ||
+    diagnosisSearch.trim() ||
+    diagnosisNotes.trim() ||
+    noteDraft.trim() ||
+    carePlanDraft.trim() ||
+    examDraft.examName.trim() ||
+    examDraft.instructions.trim() ||
+    medicationDraft.medicationName.trim() ||
+    medicationDraft.presentation.trim() ||
+    medicationDraft.dosage.trim() ||
+    medicationDraft.route.trim() ||
+    medicationDraft.frequency.trim() ||
+    medicationDraft.duration.trim() ||
+    medicationDraft.instructions.trim() ||
+    procedureDraft.name.trim() ||
+    (procedureDraft.result?.trim() ?? "") ||
+    (procedureDraft.notes?.trim() ?? "") ||
+    attachmentDraft.path ||
+    procedurePhotoDraft.path,
+  );
+  const guardEnabled = Boolean(activeEncounter && hasPendingChanges);
+  const navigationGuardRef = useRef(guardEnabled);
+
+  useEffect(() => {
+    navigationGuardRef.current = guardEnabled;
+  }, [guardEnabled]);
+
+  useEffect(() => {
+    if (!guardEnabled) return;
+
+    const confirmationMessage =
+      "Hay cambios pendientes en esta atención. Si sales ahora, podrías perder contexto clínico no guardado.";
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!navigationGuardRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!navigationGuardRef.current || event.defaultPrevented) return;
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      if (!(event.target instanceof Element)) return;
+
+      const anchor = event.target.closest(
+        "a[href]",
+      ) as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+
+      const targetUrl = new URL(anchor.href, window.location.href);
+      const currentUrl = new URL(window.location.href);
+
+      if (targetUrl.origin !== currentUrl.origin) return;
+      if (
+        targetUrl.pathname === currentUrl.pathname &&
+        targetUrl.search === currentUrl.search
+      )
+        return;
+
+      const confirmed = window.confirm(confirmationMessage);
+      if (confirmed) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleDocumentClick, true);
+    };
+  }, [guardEnabled]);
 
   const invalidateBundle = () => {
     if (!activeEncounter?.id) return;
-    queryClient.invalidateQueries({ queryKey: ["encounter-bundle", activeEncounter.id] });
+    queryClient.invalidateQueries({
+      queryKey: ["encounter-bundle", activeEncounter.id],
+    });
   };
 
-  const runAction = async (messages: { loading: string; success: string }, action: () => Promise<void>) => {
+  const runAction = async (
+    messages: { loading: string; success: string },
+    action: () => Promise<void>,
+  ) => {
     setServerError(null);
     setActionFeedback({ tone: "loading", message: messages.loading });
     try {
       await action();
+      setLastSavedAt(new Date().toISOString());
       setActionFeedback({ tone: "success", message: messages.success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo completar la acción.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo completar la acción.";
       setServerError(message);
       setActionFeedback({ tone: "error", message });
     }
   };
 
-  const addDiagnosis = async (entry: { code: string | null; label: string }) => {
+  const addDiagnosis = async (entry: {
+    code: string | null;
+    label: string;
+  }) => {
     if (!activeEncounter) return;
     await createDiagnosis(client, {
       encounterId: activeEncounter.id,
@@ -480,9 +672,13 @@ export function EncounterWorkspace({
     });
     if (supportsNursing && diagnosisSource === "nursing_pae") {
       const currentSelected = nursingForm.getValues("selectedDiagnoses") ?? [];
-      nursingForm.setValue("selectedDiagnoses", [...new Set([...currentSelected, entry.label])], {
-        shouldDirty: true,
-      });
+      nursingForm.setValue(
+        "selectedDiagnoses",
+        [...new Set([...currentSelected, entry.label])],
+        {
+          shouldDirty: true,
+        },
+      );
     }
     setDiagnosisSearch("");
     setDiagnosisNotes("");
@@ -507,12 +703,23 @@ export function EncounterWorkspace({
               </p>
             </div>
             <div className="patient-glance__meta">
-              <span>Alergias: {selectedPatient.allergies?.join(", ") || "No registradas"}</span>
-              <span>Antecedentes: {selectedPatient.relevantHistory || "Sin antecedentes cargados"}</span>
+              <span>
+                Alergias:{" "}
+                {selectedPatient.allergies?.join(", ") || "No registradas"}
+              </span>
+              <span>
+                Antecedentes:{" "}
+                {selectedPatient.relevantHistory || "Sin antecedentes cargados"}
+              </span>
             </div>
           </div>
         ) : null}
-        <form className="stack" onSubmit={encounterForm.handleSubmit((values) => encounterMutation.mutate(values))}>
+        <form
+          className="stack"
+          onSubmit={encounterForm.handleSubmit((values) =>
+            encounterMutation.mutate(values),
+          )}
+        >
           <div className="form-grid">
             <FormField label="Paciente">
               <select {...encounterForm.register("patientId")}>
@@ -532,14 +739,20 @@ export function EncounterWorkspace({
               </select>
             </FormField>
             <FormField label="Inicio">
-              <input type="datetime-local" {...encounterForm.register("startedAt")} />
+              <input
+                type="datetime-local"
+                {...encounterForm.register("startedAt")}
+              />
             </FormField>
           </div>
           <FormField label="Motivo principal">
             <textarea {...encounterForm.register("chiefComplaint")} />
           </FormField>
           {actionFeedback && !activeEncounter ? (
-            <FormStatusMessage tone={actionFeedback.tone} message={actionFeedback.message} />
+            <FormStatusMessage
+              tone={actionFeedback.tone}
+              message={actionFeedback.message}
+            />
           ) : null}
           {serverError ? <div className="form-error">{serverError}</div> : null}
           <button className="btn" disabled={encounterMutation.isPending}>
@@ -550,7 +763,25 @@ export function EncounterWorkspace({
 
       {activeEncounter && selectedPatient ? (
         <>
-          {actionFeedback ? <FormStatusMessage tone={actionFeedback.tone} message={actionFeedback.message} /> : null}
+          {actionFeedback ? (
+            <FormStatusMessage
+              tone={actionFeedback.tone}
+              message={actionFeedback.message}
+            />
+          ) : null}
+          <ClinicalContextBanner
+            patient={selectedPatient}
+            encounter={activeEncounter}
+            stageLabel={`${currentStageMeta.title} · ${completedBlocks}/${totalBlocks} bloques listos`}
+            lastSavedAt={lastSavedAt}
+            hasPendingChanges={hasPendingChanges}
+            actions={
+              <div className="clinical-context-banner__inline-meta">
+                <span>{currentStageMeta.description}</span>
+                <span>{encounterAuthor}</span>
+              </div>
+            }
+          />
           <Card className="stepper-card">
             <div className="stepper-grid">
               <StageButton
@@ -593,7 +824,12 @@ export function EncounterWorkspace({
                   <SectionHeading
                     title="Signos vitales"
                     description="Primera captura clínica del encuentro, con IMC y PAM automáticos."
-                    action={<StatusBadge label={`Encounter ${activeEncounter.id.slice(0, 8)}`} tone="info" />}
+                    action={
+                      <StatusBadge
+                        label={`Encounter ${activeEncounter.id.slice(0, 8)}`}
+                        tone="info"
+                      />
+                    }
                   />
                   <form
                     className="stack"
@@ -604,114 +840,278 @@ export function EncounterWorkspace({
                           success: "Signos vitales guardados correctamente.",
                         },
                         async () => {
-                        await saveVitalSigns(client, {
-                          ...values,
-                          recordedAt: new Date(values.recordedAt).toISOString(),
-                        });
-                        invalidateBundle();
-                        setActiveStage("assessment");
+                          await saveVitalSigns(client, {
+                            ...values,
+                            recordedAt: new Date(
+                              values.recordedAt,
+                            ).toISOString(),
+                          });
+                          vitalsForm.reset(vitalsForm.getValues());
+                          invalidateBundle();
+                          setActiveStage("assessment");
                         },
                       );
                     })}
                   >
                     <div className="form-grid">
-                      <FormField label="Temperatura" error={vitalsForm.formState.errors.temperatureC?.message as string | undefined}>
-                        <input type="number" step="0.1" {...vitalsForm.register("temperatureC", numberFieldOptions)} />
+                      <FormField
+                        label="Temperatura"
+                        error={
+                          vitalsForm.formState.errors.temperatureC?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          step="0.1"
+                          {...vitalsForm.register(
+                            "temperatureC",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="FC" error={vitalsForm.formState.errors.heartRate?.message as string | undefined}>
-                        <input type="number" {...vitalsForm.register("heartRate", numberFieldOptions)} />
+                      <FormField
+                        label="FC"
+                        error={
+                          vitalsForm.formState.errors.heartRate?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          {...vitalsForm.register(
+                            "heartRate",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="FR" error={vitalsForm.formState.errors.respiratoryRate?.message as string | undefined}>
-                        <input type="number" {...vitalsForm.register("respiratoryRate", numberFieldOptions)} />
+                      <FormField
+                        label="FR"
+                        error={
+                          vitalsForm.formState.errors.respiratoryRate
+                            ?.message as string | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          {...vitalsForm.register(
+                            "respiratoryRate",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="PA sistólica" error={vitalsForm.formState.errors.systolic?.message as string | undefined}>
-                        <input type="number" {...vitalsForm.register("systolic", numberFieldOptions)} />
+                      <FormField
+                        label="PA sistólica"
+                        error={
+                          vitalsForm.formState.errors.systolic?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          {...vitalsForm.register(
+                            "systolic",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="PA diastólica" error={vitalsForm.formState.errors.diastolic?.message as string | undefined}>
-                        <input type="number" {...vitalsForm.register("diastolic", numberFieldOptions)} />
+                      <FormField
+                        label="PA diastólica"
+                        error={
+                          vitalsForm.formState.errors.diastolic?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          {...vitalsForm.register(
+                            "diastolic",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="Saturación" error={vitalsForm.formState.errors.oxygenSaturation?.message as string | undefined}>
-                        <input type="number" {...vitalsForm.register("oxygenSaturation", numberFieldOptions)} />
+                      <FormField
+                        label="Saturación"
+                        error={
+                          vitalsForm.formState.errors.oxygenSaturation
+                            ?.message as string | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          {...vitalsForm.register(
+                            "oxygenSaturation",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="Glucemia" error={vitalsForm.formState.errors.glucose?.message as string | undefined}>
-                        <input type="number" step="0.1" {...vitalsForm.register("glucose", numberFieldOptions)} />
+                      <FormField
+                        label="Glucemia"
+                        error={
+                          vitalsForm.formState.errors.glucose?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          step="0.1"
+                          {...vitalsForm.register(
+                            "glucose",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="Peso (kg)" error={vitalsForm.formState.errors.weightKg?.message as string | undefined}>
-                        <input type="number" step="0.1" placeholder="Ej. 72.5" {...vitalsForm.register("weightKg", numberFieldOptions)} />
+                      <FormField
+                        label="Peso (kg)"
+                        error={
+                          vitalsForm.formState.errors.weightKg?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="Ej. 72.5"
+                          {...vitalsForm.register(
+                            "weightKg",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
-                      <FormField label="Talla (cm)" error={vitalsForm.formState.errors.heightCm?.message as string | undefined}>
-                        <input type="number" step="0.1" {...vitalsForm.register("heightCm", numberFieldOptions)} />
+                      <FormField
+                        label="Talla (cm)"
+                        error={
+                          vitalsForm.formState.errors.heightCm?.message as
+                            | string
+                            | undefined
+                        }
+                      >
+                        <input
+                          type="number"
+                          step="0.1"
+                          {...vitalsForm.register(
+                            "heightCm",
+                            numberFieldOptions,
+                          )}
+                        />
                       </FormField>
                     </div>
-                    {serverError ? <div className="form-error">{serverError}</div> : null}
-                    <button className="btn secondary">Guardar signos vitales</button>
+                    {serverError ? (
+                      <div className="form-error">{serverError}</div>
+                    ) : null}
+                    <button className="btn secondary">
+                      Guardar signos vitales
+                    </button>
                   </form>
                   <TraceBlock
                     label="Última captura"
-                    author={bundle?.vitals?.updatedByName ?? bundle?.vitals?.createdByName}
-                    date={bundle?.vitals?.updatedAt ?? bundle?.vitals?.createdAt}
+                    author={
+                      bundle?.vitals?.updatedByName ??
+                      bundle?.vitals?.createdByName
+                    }
+                    date={
+                      bundle?.vitals?.updatedAt ?? bundle?.vitals?.createdAt
+                    }
                   />
                 </Card>
               ) : null}
 
               {activeStage === "assessment" ? (
-                <div className={supportsMedical && supportsNursing ? "two-column" : "stack"}>
+                <div
+                  className={
+                    supportsMedical && supportsNursing ? "two-column" : "stack"
+                  }
+                >
                   {supportsMedical ? (
                     <Card>
-                      <SectionHeading title="Formulario médico" description="Consulta, impresión diagnóstica y plan terapéutico." />
+                      <SectionHeading
+                        title="Formulario médico"
+                        description="Consulta, impresión diagnóstica y plan terapéutico."
+                      />
                       <form
                         className="stack"
                         onSubmit={medicalForm.handleSubmit(async (values) => {
                           await runAction(
                             {
                               loading: "Guardando valoración médica...",
-                              success: "Valoración médica guardada correctamente.",
+                              success:
+                                "Valoración médica guardada correctamente.",
                             },
                             async () => {
                               await saveMedicalAssessment(client, values);
+                              medicalForm.reset(medicalForm.getValues());
                               invalidateBundle();
                             },
                           );
                         })}
                       >
                         <FormField label="Motivo de consulta">
-                          <textarea {...medicalForm.register("chiefComplaint")} />
+                          <textarea
+                            {...medicalForm.register("chiefComplaint")}
+                          />
                         </FormField>
                         <FormField label="Enfermedad actual">
-                          <textarea {...medicalForm.register("currentIllness")} />
+                          <textarea
+                            {...medicalForm.register("currentIllness")}
+                          />
                         </FormField>
                         <FormField label="Impresión diagnóstica">
-                          <textarea {...medicalForm.register("diagnosticImpression")} />
+                          <textarea
+                            {...medicalForm.register("diagnosticImpression")}
+                          />
                         </FormField>
                         <FormField label="Plan terapéutico">
-                          <textarea {...medicalForm.register("therapeuticPlan")} />
+                          <textarea
+                            {...medicalForm.register("therapeuticPlan")}
+                          />
                         </FormField>
-                        <button className="btn secondary">Guardar médico</button>
+                        <button className="btn secondary">
+                          Guardar médico
+                        </button>
                       </form>
                       <TraceBlock
                         label="Última edición médica"
-                        author={bundle?.medical?.updatedByName ?? bundle?.medical?.createdByName}
-                        date={bundle?.medical?.updatedAt ?? bundle?.medical?.createdAt}
+                        author={
+                          bundle?.medical?.updatedByName ??
+                          bundle?.medical?.createdByName
+                        }
+                        date={
+                          bundle?.medical?.updatedAt ??
+                          bundle?.medical?.createdAt
+                        }
                       />
                     </Card>
                   ) : null}
 
                   {supportsNursing ? (
                     <Card>
-                      <SectionHeading title="Enfermería" description="Valoración base con sugerencias internas." />
+                      <SectionHeading
+                        title="Enfermería"
+                        description="Valoración base con sugerencias internas."
+                      />
                       <form
                         className="stack"
                         onSubmit={nursingForm.handleSubmit(async (values) => {
                           await runAction(
                             {
                               loading: "Guardando valoración de enfermería...",
-                              success: "Valoración de enfermería guardada correctamente.",
+                              success:
+                                "Valoración de enfermería guardada correctamente.",
                             },
                             async () => {
                               await saveNursingAssessment(client, {
                                 ...values,
-                                suggestionIds: nursingSuggestions.map((item) => item.id),
+                                suggestionIds: nursingSuggestions.map(
+                                  (item) => item.id,
+                                ),
                               });
+                              nursingForm.reset(nursingForm.getValues());
                               invalidateBundle();
                             },
                           );
@@ -731,12 +1131,20 @@ export function EncounterWorkspace({
                             </div>
                           ))}
                         </div>
-                        <button className="btn secondary">Guardar enfermería</button>
+                        <button className="btn secondary">
+                          Guardar enfermería
+                        </button>
                       </form>
                       <TraceBlock
                         label="Última edición de enfermería"
-                        author={bundle?.nursing?.updatedByName ?? bundle?.nursing?.createdByName}
-                        date={bundle?.nursing?.updatedAt ?? bundle?.nursing?.createdAt}
+                        author={
+                          bundle?.nursing?.updatedByName ??
+                          bundle?.nursing?.createdByName
+                        }
+                        date={
+                          bundle?.nursing?.updatedAt ??
+                          bundle?.nursing?.createdAt
+                        }
                       />
                     </Card>
                   ) : null}
@@ -769,7 +1177,9 @@ export function EncounterWorkspace({
                         <input
                           list="diagnosis-catalog-options"
                           value={diagnosisSearch}
-                          onChange={(event) => setDiagnosisSearch(event.target.value)}
+                          onChange={(event) =>
+                            setDiagnosisSearch(event.target.value)
+                          }
                           placeholder={
                             activeRole === "enfermeria"
                               ? "Busca plan o respuesta clínica"
@@ -781,13 +1191,22 @@ export function EncounterWorkspace({
                       </FormField>
                       <datalist id="diagnosis-catalog-options">
                         {diagnosisCatalog.map((item) => (
-                          <option key={item.code} value={`${item.code} · ${item.label}`} />
+                          <option
+                            key={item.code}
+                            value={`${item.code} · ${item.label}`}
+                          />
                         ))}
                       </datalist>
                       <FormField label="Nota diagnóstica u observación">
-                        <textarea value={diagnosisNotes} onChange={(event) => setDiagnosisNotes(event.target.value)} />
+                        <textarea
+                          value={diagnosisNotes}
+                          onChange={(event) =>
+                            setDiagnosisNotes(event.target.value)
+                          }
+                        />
                       </FormField>
-                      {diagnosisSearch.trim() && filteredDiagnosisCatalog.length ? (
+                      {diagnosisSearch.trim() &&
+                      filteredDiagnosisCatalog.length ? (
                         <div className="stack">
                           {filteredDiagnosisCatalog.map((entry) => (
                             <div key={entry.code} className="trace-row">
@@ -804,7 +1223,8 @@ export function EncounterWorkspace({
                                   runAction(
                                     {
                                       loading: "Guardando diagnóstico...",
-                                      success: "Diagnóstico agregado al encuentro.",
+                                      success:
+                                        "Diagnóstico agregado al encuentro.",
                                     },
                                     async () => {
                                       await addDiagnosis(entry);
@@ -822,7 +1242,11 @@ export function EncounterWorkspace({
                         className="btn secondary"
                         onClick={async () => {
                           const manualLabel = diagnosisSearch.includes("·")
-                            ? diagnosisSearch.split("·").slice(1).join("·").trim()
+                            ? diagnosisSearch
+                                .split("·")
+                                .slice(1)
+                                .join("·")
+                                .trim()
                             : diagnosisSearch.trim();
                           const manualCode = diagnosisSearch.includes("·")
                             ? diagnosisSearch.split("·")[0].trim()
@@ -855,14 +1279,19 @@ export function EncounterWorkspace({
                           <strong>{diagnosis.label}</strong>
                           <span>
                             {diagnosis.createdByName ?? "Sin autor"} ·{" "}
-                            {diagnosis.createdAt ? new Date(diagnosis.createdAt).toLocaleString() : "sin fecha"}
+                            {diagnosis.createdAt
+                              ? new Date(diagnosis.createdAt).toLocaleString()
+                              : "sin fecha"}
                           </span>
                         </div>
                       ))}
                     </div>
                     <div className="stack" style={{ marginTop: 18 }}>
                       <FormField label="Nueva nota clínica">
-                        <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} />
+                        <textarea
+                          value={noteDraft}
+                          onChange={(event) => setNoteDraft(event.target.value)}
+                        />
                       </FormField>
                       <button
                         className="btn secondary"
@@ -899,7 +1328,9 @@ export function EncounterWorkspace({
                           <p>{note.content}</p>
                           <span>
                             {note.createdByName ?? "Sin autor"} ·{" "}
-                            {note.createdAt ? new Date(note.createdAt).toLocaleString() : "sin fecha"}
+                            {note.createdAt
+                              ? new Date(note.createdAt).toLocaleString()
+                              : "sin fecha"}
                           </span>
                         </div>
                       ))}
@@ -907,18 +1338,31 @@ export function EncounterWorkspace({
                   </Card>
 
                   <Card>
-                    <SectionHeading title="Procedimientos" description="Registro complementario dentro del mismo episodio." />
+                    <SectionHeading
+                      title="Procedimientos"
+                      description="Registro complementario dentro del mismo episodio."
+                    />
                     <div className="stack">
                       <FormField label="Procedimiento">
                         <input
                           value={procedureDraft.name}
-                          onChange={(event) => setProcedureDraft((current) => ({ ...current, name: event.target.value }))}
+                          onChange={(event) =>
+                            setProcedureDraft((current) => ({
+                              ...current,
+                              name: event.target.value,
+                            }))
+                          }
                         />
                       </FormField>
                       <FormField label="Resultado">
                         <textarea
                           value={procedureDraft.result ?? ""}
-                          onChange={(event) => setProcedureDraft((current) => ({ ...current, result: event.target.value }))}
+                          onChange={(event) =>
+                            setProcedureDraft((current) => ({
+                              ...current,
+                              result: event.target.value,
+                            }))
+                          }
                         />
                       </FormField>
                       <FormField label="Foto de evolución del procedimiento">
@@ -943,29 +1387,42 @@ export function EncounterWorkspace({
                       {procedurePhotoDraft.path ? (
                         <div className="info-panel">
                           <strong>{procedurePhotoDraft.fileName}</strong>
-                          <span>Se guardará como evolución fotográfica del procedimiento.</span>
-                          <img src={procedurePhotoDraft.path} alt="Vista previa del procedimiento" className="attachment-preview" />
+                          <span>
+                            Se guardará como evolución fotográfica del
+                            procedimiento.
+                          </span>
+                          <img
+                            src={procedurePhotoDraft.path}
+                            alt="Vista previa del procedimiento"
+                            className="attachment-preview"
+                          />
                         </div>
                       ) : null}
                       <button
                         className="btn secondary"
                         onClick={async () => {
-                          if (!activeEncounter || !procedureDraft.name.trim()) return;
+                          if (!activeEncounter || !procedureDraft.name.trim())
+                            return;
                           await runAction(
                             {
                               loading: "Registrando procedimiento...",
                               success: "Procedimiento guardado correctamente.",
                             },
                             async () => {
-                              const createdProcedure = await createProcedure(client, {
-                                encounterId: activeEncounter.id,
-                                name: procedureDraft.name.trim(),
-                                performedAt: new Date().toISOString(),
-                                responsibleProfessional: professional ? `${professional.firstName} ${professional.lastName}` : null,
-                                materials: [],
-                                result: procedureDraft.result ?? null,
-                                notes: procedureDraft.notes ?? null,
-                              });
+                              const createdProcedure = await createProcedure(
+                                client,
+                                {
+                                  encounterId: activeEncounter.id,
+                                  name: procedureDraft.name.trim(),
+                                  performedAt: new Date().toISOString(),
+                                  responsibleProfessional: professional
+                                    ? `${professional.firstName} ${professional.lastName}`
+                                    : null,
+                                  materials: [],
+                                  result: procedureDraft.result ?? null,
+                                  notes: procedureDraft.notes ?? null,
+                                },
+                              );
                               if (procedurePhotoDraft.path && selectedPatient) {
                                 await createAttachmentRecord(client, {
                                   patientId: selectedPatient.id,
@@ -978,8 +1435,16 @@ export function EncounterWorkspace({
                                   category: "imagen",
                                 });
                               }
-                              setProcedureDraft({ name: "", result: "", notes: "" });
-                              setProcedurePhotoDraft({ fileName: "", mimeType: "image/png", path: "" });
+                              setProcedureDraft({
+                                name: "",
+                                result: "",
+                                notes: "",
+                              });
+                              setProcedurePhotoDraft({
+                                fileName: "",
+                                mimeType: "image/png",
+                                path: "",
+                              });
                               invalidateBundle();
                             },
                           );
@@ -995,32 +1460,47 @@ export function EncounterWorkspace({
                             onChange={(event) =>
                               setExamDraft((current) => ({
                                 ...current,
-                                category: event.target.value as typeof current.category,
+                                category: event.target
+                                  .value as typeof current.category,
                               }))
                             }
                           >
                             <option value="laboratorio">Laboratorio</option>
                             <option value="imagen">Imagen</option>
-                            <option value="estudio_especial">Estudio especial</option>
+                            <option value="estudio_especial">
+                              Estudio especial
+                            </option>
                           </select>
                         </FormField>
-                      <FormField label="Nombre del examen (busca por iniciales)">
+                        <FormField label="Nombre del examen (busca por iniciales)">
                           <input
                             list="exam-catalog-options"
                             placeholder="Ej. bio, eco, radio, elec..."
                             value={examDraft.examName}
-                            onChange={(event) => setExamDraft((current) => ({ ...current, examName: event.target.value }))}
+                            onChange={(event) =>
+                              setExamDraft((current) => ({
+                                ...current,
+                                examName: event.target.value,
+                              }))
+                            }
                           />
-                      </FormField>
+                        </FormField>
                         <datalist id="exam-catalog-options">
                           {filteredExamCatalog.map((entry) => (
-                            <option key={`${entry.category}-${entry.label}`} value={entry.label} />
+                            <option
+                              key={`${entry.category}-${entry.label}`}
+                              value={entry.label}
+                            />
                           ))}
                         </datalist>
-                        {examDraft.examName.trim() && filteredExamCatalog.length ? (
+                        {examDraft.examName.trim() &&
+                        filteredExamCatalog.length ? (
                           <div className="stack">
                             {filteredExamCatalog.slice(0, 6).map((entry) => (
-                              <div key={`${entry.category}-${entry.label}`} className="trace-row">
+                              <div
+                                key={`${entry.category}-${entry.label}`}
+                                className="trace-row"
+                              >
                                 <div>
                                   <strong>{entry.label}</strong>
                                   <span>{entry.panel ?? entry.category}</span>
@@ -1028,7 +1508,12 @@ export function EncounterWorkspace({
                                 <button
                                   className="pill-link"
                                   type="button"
-                                  onClick={() => setExamDraft((current) => ({ ...current, examName: entry.label }))}
+                                  onClick={() =>
+                                    setExamDraft((current) => ({
+                                      ...current,
+                                      examName: entry.label,
+                                    }))
+                                  }
                                 >
                                   Usar
                                 </button>
@@ -1040,7 +1525,10 @@ export function EncounterWorkspace({
                           <textarea
                             value={examDraft.instructions}
                             onChange={(event) =>
-                              setExamDraft((current) => ({ ...current, instructions: event.target.value }))
+                              setExamDraft((current) => ({
+                                ...current,
+                                instructions: event.target.value,
+                              }))
                             }
                           />
                         </FormField>
@@ -1048,7 +1536,8 @@ export function EncounterWorkspace({
                           className="btn secondary"
                           type="button"
                           onClick={async () => {
-                            if (!activeEncounter || !examDraft.examName.trim()) return;
+                            if (!activeEncounter || !examDraft.examName.trim())
+                              return;
                             await runAction(
                               {
                                 loading: "Solicitando examen...",
@@ -1063,7 +1552,11 @@ export function EncounterWorkspace({
                                   status: "pendiente",
                                   orderedAt: new Date().toISOString(),
                                 });
-                                setExamDraft({ category: "laboratorio", examName: "", instructions: "" });
+                                setExamDraft({
+                                  category: "laboratorio",
+                                  examName: "",
+                                  instructions: "",
+                                });
                                 invalidateBundle();
                               },
                             );
@@ -1074,10 +1567,16 @@ export function EncounterWorkspace({
                         {(bundle?.examOrders ?? []).map((examOrder) => (
                           <div key={examOrder.id} className="trace-row">
                             <strong>{examOrder.examName}</strong>
-                            <p>{examOrder.instructions ?? "Sin indicaciones adicionales."}</p>
+                            <p>
+                              {examOrder.instructions ??
+                                "Sin indicaciones adicionales."}
+                            </p>
                             <span>
-                              {examOrder.category} · {examOrder.createdByName ?? "Sin autor"} ·{" "}
-                              {examOrder.orderedAt ? new Date(examOrder.orderedAt).toLocaleString() : "sin fecha"}
+                              {examOrder.category} ·{" "}
+                              {examOrder.createdByName ?? "Sin autor"} ·{" "}
+                              {examOrder.orderedAt
+                                ? new Date(examOrder.orderedAt).toLocaleString()
+                                : "sin fecha"}
                             </span>
                           </div>
                         ))}
@@ -1094,8 +1593,12 @@ export function EncounterWorkspace({
                               reader.onload = () => {
                                 setAttachmentDraft({
                                   fileName: file.name,
-                                  mimeType: file.type || "application/octet-stream",
-                                  category: file.type === "application/pdf" ? "pdf" : "resultado",
+                                  mimeType:
+                                    file.type || "application/octet-stream",
+                                  category:
+                                    file.type === "application/pdf"
+                                      ? "pdf"
+                                      : "resultado",
                                   path: String(reader.result ?? ""),
                                 });
                               };
@@ -1113,7 +1616,13 @@ export function EncounterWorkspace({
                           className="btn secondary"
                           type="button"
                           onClick={async () => {
-                            if (!activeEncounter || !selectedPatient || !attachmentDraft.path || !attachmentDraft.fileName) return;
+                            if (
+                              !activeEncounter ||
+                              !selectedPatient ||
+                              !attachmentDraft.path ||
+                              !attachmentDraft.fileName
+                            )
+                              return;
                             await runAction(
                               {
                                 loading: "Guardando adjunto clínico...",
@@ -1148,11 +1657,20 @@ export function EncounterWorkspace({
                           <div key={attachment.id} className="trace-row">
                             <strong>{attachment.fileName}</strong>
                             <span>
-                              {attachment.category} · {attachment.createdByName ?? "Sin autor"} ·{" "}
-                              {attachment.createdAt ? new Date(attachment.createdAt).toLocaleString() : "sin fecha"}
+                              {attachment.category} ·{" "}
+                              {attachment.createdByName ?? "Sin autor"} ·{" "}
+                              {attachment.createdAt
+                                ? new Date(
+                                    attachment.createdAt,
+                                  ).toLocaleString()
+                                : "sin fecha"}
                             </span>
                             {attachment.path?.startsWith("data:") ? (
-                              <a href={attachment.path} download={attachment.fileName} className="pill-link">
+                              <a
+                                href={attachment.path}
+                                download={attachment.fileName}
+                                className="pill-link"
+                              >
                                 Descargar
                               </a>
                             ) : null}
@@ -1162,19 +1680,35 @@ export function EncounterWorkspace({
                       {(bundle?.procedures ?? []).map((procedure) => (
                         <div key={procedure.id} className="trace-row">
                           <strong>{procedure.name}</strong>
-                          <p>{procedure.result ?? procedure.notes ?? "Sin observaciones."}</p>
+                          <p>
+                            {procedure.result ??
+                              procedure.notes ??
+                              "Sin observaciones."}
+                          </p>
                           <span>
                             {procedure.createdByName ?? "Sin autor"} ·{" "}
-                            {procedure.createdAt ? new Date(procedure.createdAt).toLocaleString() : "sin fecha"}
+                            {procedure.createdAt
+                              ? new Date(procedure.createdAt).toLocaleString()
+                              : "sin fecha"}
                           </span>
                         </div>
                       ))}
-                      {(bundle?.attachments ?? []).filter((attachment) => attachment.category === "imagen" && attachment.fileName.startsWith("procedimiento-")).length ? (
+                      {(bundle?.attachments ?? []).filter(
+                        (attachment) =>
+                          attachment.category === "imagen" &&
+                          attachment.fileName.startsWith("procedimiento-"),
+                      ).length ? (
                         <div className="stack" style={{ marginTop: 18 }}>
                           <strong>Evolución fotográfica</strong>
                           <div className="photo-grid">
                             {(bundle?.attachments ?? [])
-                              .filter((attachment) => attachment.category === "imagen" && attachment.fileName.startsWith("procedimiento-"))
+                              .filter(
+                                (attachment) =>
+                                  attachment.category === "imagen" &&
+                                  attachment.fileName.startsWith(
+                                    "procedimiento-",
+                                  ),
+                              )
                               .map((attachment) => (
                                 <a
                                   key={attachment.id}
@@ -1182,7 +1716,11 @@ export function EncounterWorkspace({
                                   download={attachment.fileName}
                                   className="photo-card"
                                 >
-                                  <img src={attachment.path} alt={attachment.fileName} className="attachment-preview" />
+                                  <img
+                                    src={attachment.path}
+                                    alt={attachment.fileName}
+                                    className="attachment-preview"
+                                  />
                                   <span>{attachment.fileName}</span>
                                 </a>
                               ))}
@@ -1212,43 +1750,61 @@ export function EncounterWorkspace({
                             list="medication-catalog-options"
                             value={medicationDraft.medicationName}
                             onChange={(event) =>
-                              setMedicationDraft((current) => ({ ...current, medicationName: event.target.value }))
+                              setMedicationDraft((current) => ({
+                                ...current,
+                                medicationName: event.target.value,
+                              }))
                             }
                             placeholder="Ej. para, ibu, amoxi, losa..."
                           />
                         </FormField>
                         <datalist id="medication-catalog-options">
-                          {[...new Set(medicationCatalog.map((item) => item.name))].map((name) => (
+                          {[
+                            ...new Set(
+                              medicationCatalog.map((item) => item.name),
+                            ),
+                          ].map((name) => (
                             <option key={name} value={name} />
                           ))}
                         </datalist>
-                        {medicationDraft.medicationName.trim() && filteredMedicationCatalog.length ? (
+                        {medicationDraft.medicationName.trim() &&
+                        filteredMedicationCatalog.length ? (
                           <div className="stack">
-                            {filteredMedicationCatalog.slice(0, 6).map((item) => (
-                              <div key={`${item.name}-${item.presentation}`} className="trace-row">
-                                <div>
-                                  <strong>{item.name}</strong>
-                                  <p>
-                                    {item.presentation}
-                                    {item.commonDose ? ` · ${item.commonDose}` : ""}
-                                  </p>
-                                </div>
-                                <button
-                                  className="pill-link"
-                                  type="button"
-                                  onClick={() =>
-                                    setMedicationDraft((current) => ({
-                                      ...current,
-                                      medicationName: item.name,
-                                      presentation: item.presentation,
-                                      dosage: current.dosage || item.commonDose || "",
-                                    }))
-                                  }
+                            {filteredMedicationCatalog
+                              .slice(0, 6)
+                              .map((item) => (
+                                <div
+                                  key={`${item.name}-${item.presentation}`}
+                                  className="trace-row"
                                 >
-                                  Usar
-                                </button>
-                              </div>
-                            ))}
+                                  <div>
+                                    <strong>{item.name}</strong>
+                                    <p>
+                                      {item.presentation}
+                                      {item.commonDose
+                                        ? ` · ${item.commonDose}`
+                                        : ""}
+                                    </p>
+                                  </div>
+                                  <button
+                                    className="pill-link"
+                                    type="button"
+                                    onClick={() =>
+                                      setMedicationDraft((current) => ({
+                                        ...current,
+                                        medicationName: item.name,
+                                        presentation: item.presentation,
+                                        dosage:
+                                          current.dosage ||
+                                          item.commonDose ||
+                                          "",
+                                      }))
+                                    }
+                                  >
+                                    Usar
+                                  </button>
+                                </div>
+                              ))}
                           </div>
                         ) : null}
                         <div className="form-grid">
@@ -1256,7 +1812,10 @@ export function EncounterWorkspace({
                             <input
                               value={medicationDraft.presentation}
                               onChange={(event) =>
-                                setMedicationDraft((current) => ({ ...current, presentation: event.target.value }))
+                                setMedicationDraft((current) => ({
+                                  ...current,
+                                  presentation: event.target.value,
+                                }))
                               }
                             />
                           </FormField>
@@ -1264,7 +1823,10 @@ export function EncounterWorkspace({
                             <input
                               value={medicationDraft.dosage}
                               onChange={(event) =>
-                                setMedicationDraft((current) => ({ ...current, dosage: event.target.value }))
+                                setMedicationDraft((current) => ({
+                                  ...current,
+                                  dosage: event.target.value,
+                                }))
                               }
                             />
                           </FormField>
@@ -1272,7 +1834,10 @@ export function EncounterWorkspace({
                             <input
                               value={medicationDraft.route}
                               onChange={(event) =>
-                                setMedicationDraft((current) => ({ ...current, route: event.target.value }))
+                                setMedicationDraft((current) => ({
+                                  ...current,
+                                  route: event.target.value,
+                                }))
                               }
                             />
                           </FormField>
@@ -1280,7 +1845,10 @@ export function EncounterWorkspace({
                             <input
                               value={medicationDraft.frequency}
                               onChange={(event) =>
-                                setMedicationDraft((current) => ({ ...current, frequency: event.target.value }))
+                                setMedicationDraft((current) => ({
+                                  ...current,
+                                  frequency: event.target.value,
+                                }))
                               }
                             />
                           </FormField>
@@ -1288,7 +1856,10 @@ export function EncounterWorkspace({
                             <input
                               value={medicationDraft.duration}
                               onChange={(event) =>
-                                setMedicationDraft((current) => ({ ...current, duration: event.target.value }))
+                                setMedicationDraft((current) => ({
+                                  ...current,
+                                  duration: event.target.value,
+                                }))
                               }
                             />
                           </FormField>
@@ -1297,7 +1868,10 @@ export function EncounterWorkspace({
                           <textarea
                             value={medicationDraft.instructions}
                             onChange={(event) =>
-                              setMedicationDraft((current) => ({ ...current, instructions: event.target.value }))
+                              setMedicationDraft((current) => ({
+                                ...current,
+                                instructions: event.target.value,
+                              }))
                             }
                           />
                         </FormField>
@@ -1309,10 +1883,15 @@ export function EncounterWorkspace({
                             const parsed = medicationOrderSchema.safeParse({
                               ...medicationDraft,
                               encounterId: activeEncounter.id,
-                              prescriberRole: activeRole === "medico" ? "medico" : "profesional_mixto",
+                              prescriberRole:
+                                activeRole === "medico"
+                                  ? "medico"
+                                  : "profesional_mixto",
                             });
                             if (!parsed.success) {
-                              const message = parsed.error.issues[0]?.message ?? "Completa el medicamento antes de guardar.";
+                              const message =
+                                parsed.error.issues[0]?.message ??
+                                "Completa el medicamento antes de guardar.";
                               setServerError(message);
                               setActionFeedback({ tone: "error", message });
                               return;
@@ -1323,7 +1902,10 @@ export function EncounterWorkspace({
                                 success: "Medicación guardada correctamente.",
                               },
                               async () => {
-                                await createMedicationOrder(client, parsed.data);
+                                await createMedicationOrder(
+                                  client,
+                                  parsed.data,
+                                );
                                 setMedicationDraft({
                                   medicationName: "",
                                   presentation: "",
@@ -1344,7 +1926,10 @@ export function EncounterWorkspace({
                     ) : (
                       <div className="info-panel">
                         <strong>Medicación deshabilitada</strong>
-                        <span>Solo perfiles médicos o mixtos pueden registrar prescripción farmacológica en esta fase.</span>
+                        <span>
+                          Solo perfiles médicos o mixtos pueden registrar
+                          prescripción farmacológica en esta fase.
+                        </span>
                       </div>
                     )}
 
@@ -1352,13 +1937,21 @@ export function EncounterWorkspace({
                       <div key={medication.id} className="trace-row">
                         <strong>{medication.medicationName}</strong>
                         <p>
-                          {[medication.presentation, medication.dosage, medication.route, medication.frequency, medication.duration]
+                          {[
+                            medication.presentation,
+                            medication.dosage,
+                            medication.route,
+                            medication.frequency,
+                            medication.duration,
+                          ]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
                         <span>
                           {medication.createdByName ?? "Sin autor"} ·{" "}
-                          {medication.createdAt ? new Date(medication.createdAt).toLocaleString() : "sin fecha"}
+                          {medication.createdAt
+                            ? new Date(medication.createdAt).toLocaleString()
+                            : "sin fecha"}
                         </span>
                       </div>
                     ))}
@@ -1374,8 +1967,12 @@ export function EncounterWorkspace({
                         {internalNursingSuggestionCatalog.map((item) => (
                           <div key={item.id} className="ax-card">
                             <strong>{item.label}</strong>
-                            <p className="muted">Resultados esperados: {item.outcomes.join(" · ")}</p>
-                            <p className="muted">Intervenciones: {item.interventions.join(" · ")}</p>
+                            <p className="muted">
+                              Resultados esperados: {item.outcomes.join(" · ")}
+                            </p>
+                            <p className="muted">
+                              Intervenciones: {item.interventions.join(" · ")}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -1389,7 +1986,12 @@ export function EncounterWorkspace({
                             : "Indicaciones al paciente"
                       }
                     >
-                      <textarea value={carePlanDraft} onChange={(event) => setCarePlanDraft(event.target.value)} />
+                      <textarea
+                        value={carePlanDraft}
+                        onChange={(event) =>
+                          setCarePlanDraft(event.target.value)
+                        }
+                      />
                     </FormField>
                     <button
                       className="btn secondary"
@@ -1399,7 +2001,8 @@ export function EncounterWorkspace({
                         await runAction(
                           {
                             loading: "Guardando plan e indicaciones...",
-                            success: "Plan e indicaciones guardados correctamente.",
+                            success:
+                              "Plan e indicaciones guardados correctamente.",
                           },
                           async () => {
                             await saveClinicalNote(client, {
@@ -1416,14 +2019,22 @@ export function EncounterWorkspace({
                       Guardar plan
                     </button>
                     {(bundle?.notes ?? [])
-                      .filter((note) => ["patient_indications", "nursing_care_plan", "psychology_plan"].includes(note.noteKind))
+                      .filter((note) =>
+                        [
+                          "patient_indications",
+                          "nursing_care_plan",
+                          "psychology_plan",
+                        ].includes(note.noteKind),
+                      )
                       .map((note) => (
                         <div key={note.id} className="trace-row">
                           <strong>{note.noteKind}</strong>
                           <p>{note.content}</p>
                           <span>
                             {note.createdByName ?? "Sin autor"} ·{" "}
-                            {note.createdAt ? new Date(note.createdAt).toLocaleString() : "sin fecha"}
+                            {note.createdAt
+                              ? new Date(note.createdAt).toLocaleString()
+                              : "sin fecha"}
                           </span>
                         </div>
                       ))}
@@ -1433,7 +2044,10 @@ export function EncounterWorkspace({
 
               {activeStage === "summary" ? (
                 <Card>
-                  <SectionHeading title="Resumen e impresión" description="Cierre del encuentro con trazabilidad y PDF clínico base." />
+                  <SectionHeading
+                    title="Resumen e impresión"
+                    description="Cierre del encuentro con trazabilidad y PDF clínico base."
+                  />
                   <div className="summary-grid">
                     <div className="summary-item">
                       <span>Paciente</span>
@@ -1481,7 +2095,11 @@ export function EncounterWorkspace({
                       fileName={`encounter-${activeEncounter.id}.pdf`}
                     >
                       {({ loading }) => (
-                        <button className="btn warn">{loading ? "Preparando PDF..." : "Descargar resumen clínico"}</button>
+                        <button className="btn warn">
+                          {loading
+                            ? "Preparando PDF..."
+                            : "Descargar resumen clínico"}
+                        </button>
                       )}
                     </PDFDownloadLink>
                   </div>
@@ -1490,7 +2108,10 @@ export function EncounterWorkspace({
             </div>
 
             <Card className="workspace-aside">
-              <SectionHeading title="Resumen del encuentro" description="Contexto y avance del flujo clínico." />
+              <SectionHeading
+                title="Resumen del encuentro"
+                description="Contexto y avance del flujo clínico."
+              />
               <div className="meta-strip">
                 <strong>Paciente</strong>
                 <span>
@@ -1503,7 +2124,9 @@ export function EncounterWorkspace({
               </div>
               <div className="meta-strip">
                 <strong>Apertura</strong>
-                <span>{new Date(activeEncounter.startedAt).toLocaleString()}</span>
+                <span>
+                  {new Date(activeEncounter.startedAt).toLocaleString()}
+                </span>
               </div>
               <div className="meta-strip">
                 <strong>Autor</strong>
@@ -1511,12 +2134,34 @@ export function EncounterWorkspace({
               </div>
 
               <div className="progress-list">
-                <ProgressItem label="Encounter abierto" done={progress.encounter} />
-                <ProgressItem label="Signos vitales guardados" done={progress.vitals} />
-                {supportsMedical ? <ProgressItem label="Valoración médica" done={progress.medical} /> : null}
-                {supportsNursing ? <ProgressItem label="Valoración de enfermería" done={progress.nursing} /> : null}
-                <ProgressItem label="Diagnósticos, notas o procedimientos" done={progress.records} />
-                <ProgressItem label="Plan, indicaciones o medicación" done={progress.treatment} />
+                <ProgressItem
+                  label="Encounter abierto"
+                  done={progress.encounter}
+                />
+                <ProgressItem
+                  label="Signos vitales guardados"
+                  done={progress.vitals}
+                />
+                {supportsMedical ? (
+                  <ProgressItem
+                    label="Valoración médica"
+                    done={progress.medical}
+                  />
+                ) : null}
+                {supportsNursing ? (
+                  <ProgressItem
+                    label="Valoración de enfermería"
+                    done={progress.nursing}
+                  />
+                ) : null}
+                <ProgressItem
+                  label="Diagnósticos, notas o procedimientos"
+                  done={progress.records}
+                />
+                <ProgressItem
+                  label="Plan, indicaciones o medicación"
+                  done={progress.treatment}
+                />
               </div>
 
               <div className="info-panel">
@@ -1530,7 +2175,7 @@ export function EncounterWorkspace({
                         ? "Añade diagnósticos, notas, procedimientos y exámenes relevantes del episodio."
                         : activeStage === "treatment"
                           ? "Cierra con medicación, plan e indicaciones según el rol del profesional."
-                        : "Revisa el resumen final y descarga el PDF clínico."}
+                          : "Revisa el resumen final y descarga el PDF clínico."}
                 </span>
               </div>
             </Card>
