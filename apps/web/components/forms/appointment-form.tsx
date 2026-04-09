@@ -160,7 +160,7 @@ export function AppointmentForm({
   }, [watchedEndAt, watchedModality, watchedReason, watchedStartAt, selectedPatient]);
 
   return (
-    <form className="stack" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="stack appointment-form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
       <div className="form-grid">
         <FormField label="Paciente" error={form.formState.errors.patientId?.message}>
           <select {...form.register("patientId")}>
@@ -205,7 +205,7 @@ export function AppointmentForm({
         </FormField>
       </div>
       <FormField label="Motivo" error={form.formState.errors.reason?.message}>
-        <textarea {...form.register("reason")} />
+        <textarea className="appointment-form__textarea--compact" {...form.register("reason")} />
       </FormField>
       <FormField label="Correo del paciente">
         <input value={selectedPatient?.email ?? ""} readOnly placeholder="El paciente no tiene correo registrado" />
@@ -230,9 +230,11 @@ export function AppointmentForm({
       </FormField>
       {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
-      <button className="btn" disabled={mutation.isPending}>
-        {mutation.isPending ? "Guardando..." : initialAppointment ? "Actualizar cita" : "Crear cita"}
-      </button>
+      <div className="appointment-form__footer">
+        <button className="btn" disabled={mutation.isPending}>
+          {mutation.isPending ? "Guardando..." : initialAppointment ? "Actualizar cita" : "Crear cita"}
+        </button>
+      </div>
     </form>
   );
 }

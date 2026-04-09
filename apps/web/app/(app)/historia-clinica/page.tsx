@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
+import { PatientBanner } from "@/components/layout/patient-banner";
 import { useAuth } from "@/components/providers/providers";
 
 type HistoryFilter = "all" | "assessments" | "notes" | "orders" | "documents";
@@ -413,20 +413,21 @@ export default function HistoryPage() {
       </Card>
 
       {selectedPatient ? (
-        <ClinicalContextBanner
+        <PatientBanner
           patient={selectedPatient}
-          encounter={selectedEncounter}
-          stageLabel={
-            selectedEncounter
-              ? "Historia clínica longitudinal"
-              : "Paciente seleccionado sin encounter activo"
-          }
-          lastSavedAt={
-            selectedEncounter
-              ? (selectedEncounter.updatedAt ??
-                selectedEncounter.createdAt ??
-                selectedEncounter.startedAt)
-              : (selectedPatient.updatedAt ?? selectedPatient.createdAt)
+          actions={
+            <>
+              {selectedEncounter ? (
+                <StatusBadge
+                  label={selectedEncounter.status === "open" ? "Encounter abierto" : "Encounter cerrado"}
+                  tone={selectedEncounter.status === "open" ? "warning" : "success"}
+                />
+              ) : null}
+              <StatusBadge
+                label={`${encounters.length} encounter${encounters.length === 1 ? "" : "s"}`}
+                tone="info"
+              />
+            </>
           }
         />
       ) : null}

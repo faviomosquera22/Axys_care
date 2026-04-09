@@ -1,8 +1,9 @@
 "use client";
 
 import { listPatientsSharedByMe, revokePatientAccess } from "@axyscare/core-db";
-import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
+import { Card, EmptyStatePanel, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useAuth } from "@/components/providers/providers";
 import { useTableRealtime } from "@/components/realtime/use-table-realtime";
 
@@ -27,41 +28,52 @@ export default function SharedByMePage() {
         title="Compartidos por mí"
         description="Control maestro del paciente y colaboradores activos o históricos."
       />
-      {(accessQuery.data ?? []).map((access) => (
-        <div key={access.id} className="trace-row">
-          <strong>
-            {access.patient?.firstName} {access.patient?.lastName}
-          </strong>
-          <p>
-            Colaborador:{" "}
-            {access.sharedWithProfile
-              ? `${access.sharedWithProfile.firstName} ${access.sharedWithProfile.lastName}`
-              : access.sharedWithUserId}
-          </p>
-          <span>
-            Permiso {access.permissionLevel} · creado {access.createdAt ? new Date(access.createdAt).toLocaleString() : "sin fecha"}
-          </span>
-          <div className="btn-row">
-            <StatusBadge
-              label={access.status}
-              tone={access.status === "active" ? "success" : access.status === "pending" ? "warning" : "danger"}
-            />
-            <a href={`/pacientes/${access.patientId}`} className="pill-link">
-              Abrir
-            </a>
-            {access.status === "active" ? (
-              <button
-                className="btn ghost"
-                onClick={() => revokeMutation.mutate(access.id)}
-                disabled={revokeMutation.isPending}
-              >
-                Revocar
-              </button>
-            ) : null}
+      {(accessQuery.data ?? []).length ? (
+        (accessQuery.data ?? []).map((access) => (
+          <div key={access.id} className="trace-row">
+            <strong>
+              {access.patient?.firstName} {access.patient?.lastName}
+            </strong>
+            <p>
+              Colaborador:{" "}
+              {access.sharedWithProfile
+                ? `${access.sharedWithProfile.firstName} ${access.sharedWithProfile.lastName}`
+                : access.sharedWithUserId}
+            </p>
+            <span>
+              Permiso {access.permissionLevel} · creado {access.createdAt ? new Date(access.createdAt).toLocaleString() : "sin fecha"}
+            </span>
+            <div className="btn-row">
+              <StatusBadge
+                label={access.status}
+                tone={access.status === "active" ? "success" : access.status === "pending" ? "warning" : "danger"}
+              />
+              <Link href={`/pacientes/${access.patientId}`} className="pill-link">
+                Abrir
+              </Link>
+              {access.status === "active" ? (
+                <button
+                  className="btn ghost"
+                  onClick={() => revokeMutation.mutate(access.id)}
+                  disabled={revokeMutation.isPending}
+                >
+                  Revocar
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ))}
+        ))
+      ) : (
+        <EmptyStatePanel
+          title="Todavía no has compartido pacientes"
+          description="Invita a otro profesional desde la ficha o desde la lista de pacientes para empezar a colaborar sobre el mismo expediente."
+          action={
+            <Link href="/pacientes" className="btn secondary">
+              Invitar profesional
+            </Link>
+          }
+        />
+      )}
     </Card>
   );
 }
-

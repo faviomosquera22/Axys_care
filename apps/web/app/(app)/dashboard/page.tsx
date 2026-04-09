@@ -1,8 +1,9 @@
 "use client";
 
 import { listAppointments, listEncounters, listPatients } from "@axyscare/core-db";
-import { MetricCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
+import { EmptyStatePanel, MetricCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { DashboardChart } from "@/components/charts/dashboard-chart";
 import { useAuth } from "@/components/providers/providers";
 
@@ -56,35 +57,58 @@ export default function DashboardPage() {
         <div className="stack">
           <div className="ax-card">
             <SectionHeading title="Próximas citas" description="Próximos movimientos operativos." />
-            {(appointments.slice(0, 5) ?? []).map((appointment) => (
-              <div key={appointment.id} className="list-row">
-                <div>
-                  <strong>{new Date(appointment.startAt).toLocaleString()}</strong>
-                  <p className="muted">{appointment.reason}</p>
+            {appointments.length ? (
+              (appointments.slice(0, 5) ?? []).map((appointment) => (
+                <div key={appointment.id} className="list-row">
+                  <div>
+                    <strong>{new Date(appointment.startAt).toLocaleString()}</strong>
+                    <p className="muted">{appointment.reason}</p>
+                  </div>
+                  <StatusBadge label={appointment.status} tone={appointment.status === "atendida" ? "success" : "warning"} />
                 </div>
-                <StatusBadge label={appointment.status} tone={appointment.status === "atendida" ? "success" : "warning"} />
-              </div>
-            ))}
+              ))
+            ) : (
+              <EmptyStatePanel
+                title="Sin citas todavía"
+                description="Empieza la agenda clínica creando la primera cita del día."
+                action={
+                  <Link href="/agenda" className="btn secondary">
+                    Agendar primera cita
+                  </Link>
+                }
+              />
+            )}
           </div>
           <div className="ax-card">
             <SectionHeading title="Pacientes recientes" description="Últimos registros creados." />
-            {(patients.slice(0, 5) ?? []).map((patient) => (
-              <div key={patient.id} className="list-row">
-                <div>
-                  <strong>
-                    {patient.firstName} {patient.lastName}
-                  </strong>
-                  <p className="muted">{patient.documentNumber}</p>
+            {patients.length ? (
+              (patients.slice(0, 5) ?? []).map((patient) => (
+                <div key={patient.id} className="list-row">
+                  <div>
+                    <strong>
+                      {patient.firstName} {patient.lastName}
+                    </strong>
+                    <p className="muted">{patient.documentNumber}</p>
+                  </div>
+                  <Link href={`/pacientes/${patient.id}`} className="pill-link">
+                    Abrir
+                  </Link>
                 </div>
-                <a href={`/pacientes/${patient.id}`} className="pill-link">
-                  Abrir
-                </a>
-              </div>
-            ))}
+              ))
+            ) : (
+              <EmptyStatePanel
+                title="Sin pacientes registrados"
+                description="Registra el primer paciente para convertir el dashboard en una estación clínica útil."
+                action={
+                  <Link href="/pacientes" className="btn secondary">
+                    Registrar primer paciente
+                  </Link>
+                }
+              />
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 }
-

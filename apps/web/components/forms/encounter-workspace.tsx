@@ -690,7 +690,7 @@ export function EncounterWorkspace({
       <Card>
         <SectionHeading
           title="Abrir episodio clínico"
-          description="La atención nace con el paciente, se materializa en un encounter y luego se completa por etapas."
+          description="Mantén paciente, tipo, motivo e inicio visibles en una sola estación compacta."
         />
         {selectedPatient ? (
           <div className="patient-glance">
@@ -715,12 +715,13 @@ export function EncounterWorkspace({
           </div>
         ) : null}
         <form
-          className="stack"
-          onSubmit={encounterForm.handleSubmit((values) =>
-            encounterMutation.mutate(values),
-          )}
+          className="encounter-entry-card"
+          onSubmit={encounterForm.handleSubmit((values) => {
+            if (activeEncounter) return;
+            encounterMutation.mutate(values);
+          })}
         >
-          <div className="form-grid">
+          <div className="encounter-entry-grid">
             <FormField label="Paciente">
               <select {...encounterForm.register("patientId")}>
                 <option value="">Selecciona</option>
@@ -744,9 +745,22 @@ export function EncounterWorkspace({
                 {...encounterForm.register("startedAt")}
               />
             </FormField>
+            <button
+              className="btn"
+              disabled={encounterMutation.isPending || Boolean(activeEncounter)}
+            >
+              {encounterMutation.isPending
+                ? "Abriendo..."
+                : activeEncounter
+                  ? "Encounter en curso"
+                  : "Abrir encuentro"}
+            </button>
           </div>
           <FormField label="Motivo principal">
-            <textarea {...encounterForm.register("chiefComplaint")} />
+            <textarea
+              className="appointment-form__textarea--compact"
+              {...encounterForm.register("chiefComplaint")}
+            />
           </FormField>
           {actionFeedback && !activeEncounter ? (
             <FormStatusMessage
@@ -755,9 +769,6 @@ export function EncounterWorkspace({
             />
           ) : null}
           {serverError ? <div className="form-error">{serverError}</div> : null}
-          <button className="btn" disabled={encounterMutation.isPending}>
-            {encounterMutation.isPending ? "Abriendo..." : "Abrir encuentro"}
-          </button>
         </form>
       </Card>
 

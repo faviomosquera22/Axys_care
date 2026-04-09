@@ -11,7 +11,7 @@ import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
+import { PatientBanner } from "@/components/layout/patient-banner";
 import { PatientSharePanel } from "@/components/forms/patient-share-panel";
 import { useAuth } from "@/components/providers/providers";
 import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
@@ -213,20 +213,21 @@ export default function PatientDetailPage() {
         </div>
       </section>
 
-      <ClinicalContextBanner
+      <PatientBanner
         patient={patient}
-        encounter={openEncounter ?? latestEncounter}
-        stageLabel={
-          openEncounter
-            ? "Encounter abierto en curso"
-            : latestEncounter
-              ? "Ficha y continuidad clínica"
-              : "Paciente sin encounter activo"
-        }
-        lastSavedAt={
-          (openEncounter ?? latestEncounter)?.updatedAt ??
-          (openEncounter ?? latestEncounter)?.createdAt ??
-          (openEncounter ?? latestEncounter)?.startedAt
+        actions={
+          <>
+            <StatusBadge
+              label={openEncounter ? "Encounter abierto" : "Sin encounter abierto"}
+              tone={openEncounter ? "warning" : "neutral"}
+            />
+            {activeCollaborators ? (
+              <StatusBadge
+                label={`${activeCollaborators} colaborador${activeCollaborators === 1 ? "" : "es"}`}
+                tone="info"
+              />
+            ) : null}
+          </>
         }
       />
 
