@@ -2,7 +2,7 @@
 
 import { calculateAge } from "@axyscare/core-clinical";
 import type { Patient } from "@axyscare/core-types";
-import { listPatients, searchProfessionals, sharePatient } from "@axyscare/core-db";
+import { deletePatient, listPatients, searchProfessionals, sharePatient } from "@axyscare/core-db";
 import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ import { PatientForm } from "@/components/forms/patient-form";
 import { useAuth } from "@/components/providers/providers";
 import { useTableRealtime } from "@/components/realtime/use-table-realtime";
 
-function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
+function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" | "delete" }) {
   if (kind === "open") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -33,6 +33,14 @@ function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M15.7 8.1a3.5 3.5 0 1 0-1.3-2.7c0 .2 0 .4.1.6L8.8 9.1a3.5 3.5 0 1 0 0 5.8l5.7 3.1a3.1 3.1 0 0 0-.1.7 3.5 3.5 0 1 0 1.1-2.5l-5.9-3.2a3.6 3.6 0 0 0 0-1.8l6.1-3.1Z" />
+      </svg>
+    );
+  }
+
+  if (kind === "delete") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-.7 10.2A2 2 0 0 1 14.3 21H9.7a2 2 0 0 1-2-1.8L7 9Zm3 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" />
       </svg>
     );
   }
@@ -98,6 +106,25 @@ export default function PatientsPage() {
       setShareSearch("");
       setSelectedProfessionalId("");
       setPermissionLevel("read");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (patientId: string) => deletePatient(client, patientId),
+    onSuccess: (_, deletedPatientId) => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients", deferredSearch] });
+      queryClient.invalidateQueries({ queryKey: ["patient", deletedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ["encounters", deletedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ["patient-access", deletedPatientId] });
+      queryClient.invalidateQueries({ queryKey: ["patients-shared-with-me"] });
+      queryClient.invalidateQueries({ queryKey: ["patients-shared-by-me"] });
+      if (editingPatient?.id === deletedPatientId) {
+        setEditingPatient(null);
+      }
+      if (sharingPatient?.id === deletedPatientId) {
+        setSharingPatient(null);
+      }
     },
   });
 
@@ -243,6 +270,28 @@ export default function PatientsPage() {
                     <ActionIcon kind="edit" />
                     <span>Editar</span>
                   </button>
+                  {patient.relationshipToViewer === "owner" ? (
+                    <button
+                      type="button"
+                      className="action-pill action-pill--danger"
+                      title="Eliminar paciente"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Eliminar a ${patient.firstName} ${patient.lastName} borrará citas, encounters y accesos compartidos asociados. Esta acción no se puede deshacer. ¿Continuar?`,
+                          )
+                        ) {
+                          return;
+                        }
+
+                        deleteMutation.mutate(patient.id);
+                      }}
+                    >
+                      <ActionIcon kind="delete" />
+                      <span>Eliminar</span>
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -386,6 +435,13 @@ export default function PatientsPage() {
             <Link href={`/pacientes/${editingPatient.id}`} className="pill-link">
               Abrir ficha
             </Link>
+          </div>
+        ) : null}
+        {deleteMutation.error ? (
+          <div className="form-error">
+            {deleteMutation.error instanceof Error
+              ? deleteMutation.error.message
+              : "No se pudo eliminar el paciente."}
           </div>
         ) : null}
         <div className="info-panel">

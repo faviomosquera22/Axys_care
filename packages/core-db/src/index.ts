@@ -290,6 +290,22 @@ export async function upsertPatient(client: SupabaseClient, input: PatientInput 
   return fromPatientRow(row);
 }
 
+export async function deletePatient(client: SupabaseClient, patientId: string) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+
+  const row = await unwrap(
+    client
+      .from("patients")
+      .delete()
+      .eq("id", patientId)
+      .select("*")
+      .single(),
+  );
+
+  return fromPatientRow(row, { relationshipToViewer: "owner" });
+}
+
 export async function listAppointments(client: SupabaseClient, from?: string, to?: string) {
   let query = client.from("appointments").select("*").order("start_at", { ascending: true });
   if (from) query = query.gte("start_at", from);
