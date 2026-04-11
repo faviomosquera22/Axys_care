@@ -1,7 +1,7 @@
 "use client";
 
 import { getPatient, getProfile, listPatients } from "@axyscare/core-db";
-import { Card } from "@axyscare/ui-shared";
+import { Card, LoadingStateCard } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -28,6 +28,17 @@ export default function NewEncounterPage() {
     queryFn: () => getProfile(client, user!.id),
     enabled: Boolean(user?.id),
   });
+
+  if (patientsQuery.isLoading || profileQuery.isLoading || (patientId && patientQuery.isLoading)) {
+    return (
+      <div className="stack">
+        <LoadingStateCard
+          title="Preparando estación de atención"
+          description="Estamos trayendo paciente, profesional y contexto del encuentro para que continúes sin perder el hilo."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="stack">
@@ -81,6 +92,20 @@ export default function NewEncounterPage() {
           <Link href="/documentos" className="patient-tabbar__link">
             Documentos
           </Link>
+        </div>
+      </section>
+      <section className="onboarding-panel">
+        <div className="onboarding-panel__card">
+          <strong>Confirma el contexto</strong>
+          <p>Valida paciente, motivo y si ya existe un encounter abierto antes de documentar.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Documenta por bloques</strong>
+          <p>Avanza paso a paso y usa el feedback del formulario para saber qué ya quedó guardado.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Cierra con continuidad</strong>
+          <p>Al terminar, vuelve a historia o agenda para dejar el seguimiento listo.</p>
         </div>
       </section>
       <Card className="workflow-banner workflow-banner--dense">

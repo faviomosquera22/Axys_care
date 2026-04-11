@@ -5,20 +5,26 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { GlobalSearch } from "@/components/layout/global-search";
+import { RouteFocusStrip } from "@/components/layout/route-focus-strip";
 import { useAuth } from "@/components/providers/providers";
 
-const items = [
-  { href: "/dashboard", label: "Dashboard" },
+const primaryItems = [
+  { href: "/dashboard", label: "Inicio" },
   { href: "/agenda", label: "Agenda" },
   { href: "/pacientes", label: "Pacientes" },
-  { href: "/compartidos-conmigo", label: "Compartidos conmigo" },
-  { href: "/compartidos-por-mi", label: "Compartidos por mí" },
+  { href: "/historia-clinica", label: "Clínica" },
+];
+
+const workspaceItems = [
   { href: "/nueva-atencion", label: "Nueva atención" },
   { href: "/historia-clinica", label: "Historia clínica" },
-  { href: "/enfermeria", label: "Enfermería" },
-  { href: "/examenes", label: "Exámenes" },
+  { href: "/documentos", label: "Documentos" },
   { href: "/procedimientos", label: "Procedimientos" },
-  { href: "/documentos", label: "Documentos clínicos" },
+  { href: "/examenes", label: "Exámenes" },
+  { href: "/enfermeria", label: "Enfermería" },
+  { href: "/compartidos-conmigo", label: "Compartidos conmigo" },
+  { href: "/compartidos-por-mi", label: "Compartidos por mí" },
   { href: "/configuracion", label: "Configuración" },
 ];
 
@@ -28,18 +34,17 @@ function getQuickActions(pathname: string) {
 
   if (patientId) {
     return [
-      { href: `/pacientes/${patientId}`, label: "Ficha" },
-      { href: `/nueva-atencion?patientId=${patientId}`, label: "Nueva atención" },
+      { href: `/nueva-atencion?patientId=${patientId}`, label: "Retomar atención" },
       { href: `/historia-clinica?patientId=${patientId}`, label: "Historia clínica" },
-      { href: "/documentos", label: "Documentos PDF" },
-      { action: "print", label: "Imprimir vista" },
+      { href: `/pacientes/${patientId}`, label: "Resumen del paciente" },
+      { href: "/agenda", label: "Programar seguimiento" },
     ];
   }
 
   if (pathname.startsWith("/agenda")) {
     return [
-      { href: "/agenda", label: "Calendario" },
       { href: "/nueva-atencion", label: "Abrir atención" },
+      { href: "/pacientes", label: "Buscar paciente" },
       { href: "/configuracion", label: "Google Calendar" },
       { action: "print", label: "Imprimir agenda" },
     ];
@@ -63,11 +68,10 @@ function getQuickActions(pathname: string) {
   }
 
   return [
-    { href: "/pacientes", label: "Pacientes" },
-    { href: "/agenda", label: "Citas" },
     { href: "/nueva-atencion", label: "Nueva atención" },
+    { href: "/agenda", label: "Agenda de hoy" },
+    { href: "/pacientes", label: "Buscar paciente" },
     { href: "/documentos", label: "Documentos clínicos" },
-    { action: "print", label: "Imprimir vista" },
   ];
 }
 
@@ -146,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span>Consulta clínica unificada</span>
           </div>
           <nav className="shell-nav">
-            {items.map((item) => (
+            {primaryItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -156,6 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          <GlobalSearch />
           <div className="shell-user">
             <div className="shell-user__avatar">{initials || "AX"}</div>
             <div className="shell-user__meta">
@@ -196,6 +201,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </div>
+        <div className="shell-workspace">
+          <span className="shell-toolbar__label">Módulos clínicos</span>
+          <div className="shell-toolbar__actions">
+            {workspaceItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`quick-chip quick-chip--ghost ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <RouteFocusStrip />
       </header>
       <main className="shell-main">{children}</main>
     </div>

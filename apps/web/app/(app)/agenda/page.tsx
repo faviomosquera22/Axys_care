@@ -7,7 +7,7 @@ import {
   listPatients,
   updateAppointmentStatus,
 } from "@axyscare/core-db";
-import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
+import { Card, EmptyStatePanel, LoadingStateCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -17,7 +17,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
-import { useAuth } from "@/components/providers/providers";
+import { trackUIEvent } from "@/lib/client-analytics";
+import { useAuth, useUI } from "@/components/providers/providers";
 
 function getAppointmentTone(status: Appointment["status"]) {
   if (status === "atendida") return "success" as const;
@@ -84,6 +85,7 @@ function formatDateTime(value: string) {
 
 export default function AgendaPage() {
   const { client } = useAuth();
+  const { notify } = useUI();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedRange, setSelectedRange] = useState<{
@@ -132,6 +134,19 @@ export default function AgendaPage() {
         new Date(appointment.startAt).getTime() >= today.getTime(),
     )
     .slice(0, 6);
+  const confirmedAppointments = todayAppointments.filter((appointment) => appointment.status === "confirmada").length;
+  const virtualAppointments = todayAppointments.filter((appointment) => appointment.modality === "virtual").length;
+
+  if (appointmentsQuery.isLoading || patientsQuery.isLoading) {
+    return (
+      <div className="stack">
+        <LoadingStateCard
+          title="Cargando agenda clínica"
+          description="Estamos reuniendo citas y pacientes para que puedas coordinar el día sin fricción."
+        />
+      </div>
+    );
+  }
 
   const startEncounterMutation = useMutation({
     mutationFn: async (appointment: Appointment) => {
@@ -148,6 +163,13 @@ export default function AgendaPage() {
         current ? { ...current, status: "atendida" } : current,
       );
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      trackUIEvent("agenda_open_encounter", encounter.id);
+      notify({
+        tone: "success",
+        message: "Encounter abierto desde la agenda.",
+        actionLabel: "Continuar",
+        actionHref: `/nueva-atencion?patientId=${encounter.patientId}&encounterId=${encounter.id}`,
+      });
     },
   });
 
@@ -167,12 +189,55 @@ export default function AgendaPage() {
           : current,
       );
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      trackUIEvent("agenda_status_change", updatedAppointment.status);
+      notify({ tone: "info", message: `Cita marcada como ${updatedAppointment.status}.` });
     },
   });
 
   return (
-    <div className="two-column">
-      <div className="stack">
+    <div className="stack">
+      <section className="page-hero page-hero--agenda">
+        <div className="page-hero__content">
+          <span className="page-hero__eyebrow">Agenda clínica</span>
+          <h1>Coordina el día y entra a la atención sin fricción</h1>
+          <p>
+            El calendario debe ayudarte a decidir rápido: qué cita sigue, qué paciente atender y
+            cuándo abrir el encounter.
+          </p>
+        </div>
+        <div className="hero-stat-grid">
+          <div className="hero-stat-card">
+            <span>Citas hoy</span>
+            <strong>{todayAppointments.length}</strong>
+          </div>
+          <div className="hero-stat-card">
+            <span>Confirmadas</span>
+            <strong>{confirmedAppointments}</strong>
+          </div>
+          <div className="hero-stat-card">
+            <span>Virtuales</span>
+            <strong>{virtualAppointments}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="onboarding-panel">
+        <div className="onboarding-panel__card">
+          <strong>Selecciona una cita</strong>
+          <p>Haz clic en la cola operativa o en el calendario para traerla al panel de acción.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Decide en un solo lugar</strong>
+          <p>Confirma, cancela o abre la atención desde el panel derecho sin saltar entre módulos.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Usa bloques libres</strong>
+          <p>Arrastra en el calendario para crear una nueva cita con hora ya precargada.</p>
+        </div>
+      </section>
+
+      <div className="two-column">
+        <div className="stack">
         <Card>
           <div className="topbar">
             <div>
@@ -205,6 +270,7 @@ export default function AgendaPage() {
             }))}
             select={(selection) => {
               setCreatedEncounterId(null);
+              trackUIEvent("agenda_select_range", `${selection.startStr}::${selection.endStr}`);
               setSelectedRange({
                 startAt: selection.startStr,
                 endAt: selection.endStr,
@@ -215,6 +281,9 @@ export default function AgendaPage() {
               const appointment =
                 appointments.find((item) => item.id === event.event.id) ?? null;
               setCreatedEncounterId(null);
+              if (appointment) {
+                trackUIEvent("agenda_select_appointment", appointment.id);
+              }
               setSelectedAppointment(appointment);
               setSelectedRange(null);
             }}
@@ -279,24 +348,49 @@ export default function AgendaPage() {
               })}
             </div>
           ) : (
-            <div className="empty-state">
-              <strong>No hay citas programadas en esta ventana.</strong>
-              <p>
-                Selecciona un rango en el calendario para crear una nueva cita o
-                vuelve a la vista mensual para revisar agenda futura.
-              </p>
-            </div>
+            <EmptyStatePanel
+              title="No hay citas programadas en esta ventana."
+              description="Selecciona un rango en el calendario para crear una nueva cita o cambia la vista para revisar agenda futura."
+            />
           )}
         </Card>
-      </div>
+        </div>
 
-      <div className="stack">
-        <Card>
+        {(selectedAppointment || selectedRange) ? (
+          <button
+            type="button"
+            aria-label="Cerrar panel lateral"
+            className="agenda-drawer__scrim"
+            onClick={() => {
+              trackUIEvent("agenda_close_drawer", "scrim");
+              setSelectedAppointment(null);
+              setSelectedRange(null);
+              setCreatedEncounterId(null);
+            }}
+          />
+        ) : null}
+        <div className={`agenda-drawer ${(selectedAppointment || selectedRange) ? "open" : ""}`}>
+          {(selectedAppointment || selectedRange) ? (
+            <button
+              type="button"
+              className="agenda-drawer__close"
+              onClick={() => {
+                trackUIEvent("agenda_close_drawer", "button");
+                setSelectedAppointment(null);
+                setSelectedRange(null);
+                setCreatedEncounterId(null);
+              }}
+            >
+              Cerrar panel
+            </button>
+          ) : null}
+          <div className="stack">
+          <Card className="operations-card">
           <SectionHeading
-            title={selectedAppointment ? "Editar cita" : "Crear cita"}
+            title={selectedAppointment ? "Panel de cita seleccionada" : "Crear o preparar cita"}
             description={
               selectedAppointment
-                ? "Modifica la cita seleccionada sin salir de la agenda."
+                ? "Las acciones importantes deben vivir aquí, no dispersas por toda la agenda."
                 : "Selecciona un bloque en el calendario o crea una cita manualmente."
             }
           />
@@ -493,18 +587,27 @@ export default function AgendaPage() {
         ) : (
           <Card>
             <SectionHeading
-              title="Sin cita seleccionada"
-              description="Elige una cita de la cola operativa o haz clic sobre un evento para ver acciones clínicas."
+              title="Cómo usar esta agenda"
+              description="La idea es reducir clics y evitar cambiar de módulo para tareas frecuentes."
             />
-            <div className="empty-state">
-              <strong>La agenda ya no es solo calendario.</strong>
-              <p>
-                Desde aquí deberías poder abrir ficha, entrar a historia,
-                iniciar atención o reagendar sin cambiar de módulo mentalmente.
-              </p>
+            <div className="compact-guide">
+              <div className="compact-guide__item">
+                <strong>1. Selecciona</strong>
+                <p>Haz clic en una cita o arrastra un bloque libre para crear una nueva.</p>
+              </div>
+              <div className="compact-guide__item">
+                <strong>2. Decide</strong>
+                <p>Confirma, cancela o entra a la atención desde el panel lateral.</p>
+              </div>
+              <div className="compact-guide__item">
+                <strong>3. Continúa</strong>
+                <p>Salta a ficha, historia o encuentro sin romper el hilo clínico.</p>
+              </div>
             </div>
           </Card>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );

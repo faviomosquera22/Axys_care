@@ -1,5 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? process.env.EAS_PROJECT_ID;
+
 const config: ExpoConfig = {
   name: "Axyscare",
   slug: "axyscare",
@@ -20,12 +22,13 @@ const config: ExpoConfig = {
   android: {
     package: "com.axyscare.mobile",
   },
-  extra: {
-    eas: {
-      projectId: "axyscare-local",
-    },
-  },
+  extra: easProjectId
+    ? {
+        eas: {
+          projectId: easProjectId,
+        },
+      }
+    : undefined,
 };
 
 export default config;
-

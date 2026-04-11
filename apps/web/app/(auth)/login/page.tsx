@@ -7,7 +7,7 @@ export default function LoginPage() {
     <div className="auth-shell">
       <Card className="auth-card">
         <h1>Ingreso clínico</h1>
-        <p>Acceso centralizado para web y móvil con una sola fuente de verdad.</p>
+        <p>Entra a tu estación clínica con agenda, pacientes e historia en un mismo flujo de trabajo.</p>
         {!isSupabaseConfigured() ? (
           <div className="setup-banner">
             Falta configurar Supabase. Completa `.env.local` con las credenciales del proyecto.
@@ -18,4 +18,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

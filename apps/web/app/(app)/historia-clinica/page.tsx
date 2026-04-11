@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { PatientBanner } from "@/components/layout/patient-banner";
+import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
 import { useAuth } from "@/components/providers/providers";
 
 type HistoryFilter = "all" | "assessments" | "notes" | "orders" | "documents";
@@ -227,13 +227,20 @@ export default function HistoryPage() {
   const { client } = useAuth();
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId") ?? "";
+  const encounterId = searchParams.get("encounterId") ?? "";
   const [selectedPatientId, setSelectedPatientId] = useState(patientId);
-  const [selectedEncounterId, setSelectedEncounterId] = useState<string>("");
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string>(encounterId);
   const [activeFilter, setActiveFilter] = useState<HistoryFilter>("all");
 
   useEffect(() => {
     setSelectedPatientId(patientId);
   }, [patientId]);
+
+  useEffect(() => {
+    if (encounterId) {
+      setSelectedEncounterId(encounterId);
+    }
+  }, [encounterId]);
 
   const patientsQuery = useQuery({
     queryKey: ["patients", "history"],
@@ -413,21 +420,20 @@ export default function HistoryPage() {
       </Card>
 
       {selectedPatient ? (
-        <PatientBanner
+        <ClinicalContextBanner
           patient={selectedPatient}
-          actions={
-            <>
-              {selectedEncounter ? (
-                <StatusBadge
-                  label={selectedEncounter.status === "open" ? "Encounter abierto" : "Encounter cerrado"}
-                  tone={selectedEncounter.status === "open" ? "warning" : "success"}
-                />
-              ) : null}
-              <StatusBadge
-                label={`${encounters.length} encounter${encounters.length === 1 ? "" : "s"}`}
-                tone="info"
-              />
-            </>
+          encounter={selectedEncounter}
+          stageLabel={
+            selectedEncounter
+              ? "Historia clínica longitudinal"
+              : "Paciente seleccionado sin encounter activo"
+          }
+          lastSavedAt={
+            selectedEncounter
+              ? (selectedEncounter.updatedAt ??
+                selectedEncounter.createdAt ??
+                selectedEncounter.startedAt)
+              : (selectedPatient.updatedAt ?? selectedPatient.createdAt)
           }
         />
       ) : null}

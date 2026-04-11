@@ -9,7 +9,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
-import { useAuth } from "@/components/providers/providers";
+import { trackUIEvent } from "@/lib/client-analytics";
+import { useAuth, useUI } from "@/components/providers/providers";
 
 function formatGoogleCalendarDate(value: string) {
   return new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
@@ -48,6 +49,7 @@ export function AppointmentForm({
   onSaved?: (appointment: Appointment) => void;
 }) {
   const { client, user } = useAuth();
+  const { notify } = useUI();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -106,6 +108,11 @@ export function AppointmentForm({
     onSuccess: async (appointment) => {
       setServerError(null);
       setSuccessMessage(initialAppointment ? "Cita actualizada correctamente." : "Cita creada correctamente.");
+      notify({
+        tone: "success",
+        message: initialAppointment ? "Cita actualizada." : "Cita creada y lista para seguimiento.",
+      });
+      trackUIEvent(initialAppointment ? "appointment_update" : "appointment_create", appointment.id);
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       if (settingsQuery.data?.googleCalendarConnected) {
         const response = await fetch("/api/google-calendar/sync", {
@@ -116,18 +123,23 @@ export function AppointmentForm({
 
         if (!response.ok) {
           const payload = (await response.json()) as { error?: string };
-          setServerError(payload.error ?? "La cita se guardó, pero no se pudo sincronizar con Google Calendar.");
+          const message = payload.error ?? "La cita se guardó, pero no se pudo sincronizar con Google Calendar.";
+          setServerError(message);
           setSuccessMessage("La cita se guardó, pero la sincronización con Google Calendar falló.");
+          notify({ tone: "error", message });
         } else {
           queryClient.invalidateQueries({ queryKey: ["appointments"] });
           setSuccessMessage("Cita guardada y sincronizada con Google Calendar.");
+          notify({ tone: "info", message: "Cita sincronizada con Google Calendar." });
         }
       }
       onSaved?.(appointment);
     },
     onError: (error) => {
       setSuccessMessage(null);
-      setServerError(error instanceof Error ? error.message : "No se pudo guardar la cita.");
+      const message = error instanceof Error ? error.message : "No se pudo guardar la cita.";
+      setServerError(message);
+      notify({ tone: "error", message });
     },
   });
 
@@ -160,9 +172,13 @@ export function AppointmentForm({
   }, [watchedEndAt, watchedModality, watchedReason, watchedStartAt, selectedPatient]);
 
   return (
-    <form className="stack appointment-form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+    <form className="stack" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
       <div className="form-grid">
-        <FormField label="Paciente" error={form.formState.errors.patientId?.message}>
+        <FormField
+          label="Paciente"
+          error={form.formState.errors.patientId?.message}
+          helper="El contexto del paciente facilitará abrir la ficha o invitar por Calendar."
+        >
           <select {...form.register("patientId")}>
             <option value="">Selecciona</option>
             {patients.map((patient) => (
@@ -181,10 +197,10 @@ export function AppointmentForm({
             ))}
           </select>
         </FormField>
-        <FormField label="Inicio" error={form.formState.errors.startAt?.message}>
+        <FormField label="Inicio" error={form.formState.errors.startAt?.message} helper="Hora en la que inicia el bloque clínico.">
           <input type="datetime-local" {...form.register("startAt")} />
         </FormField>
-        <FormField label="Fin" error={form.formState.errors.endAt?.message}>
+        <FormField label="Fin" error={form.formState.errors.endAt?.message} helper="Incluye margen realista para evitar solapamientos.">
           <input type="datetime-local" {...form.register("endAt")} />
         </FormField>
         <FormField label="Modalidad">
@@ -205,7 +221,7 @@ export function AppointmentForm({
         </FormField>
       </div>
       <FormField label="Motivo" error={form.formState.errors.reason?.message}>
-        <textarea className="appointment-form__textarea--compact" {...form.register("reason")} />
+        <textarea {...form.register("reason")} />
       </FormField>
       <FormField label="Correo del paciente">
         <input value={selectedPatient?.email ?? ""} readOnly placeholder="El paciente no tiene correo registrado" />
@@ -228,13 +244,12 @@ export function AppointmentForm({
       <FormField label="Notas">
         <textarea {...form.register("notes")} />
       </FormField>
+      {mutation.isPending ? <FormStatusMessage tone="loading" message="Guardando cita y preparando continuidad..." /> : null}
       {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
-      <div className="appointment-form__footer">
-        <button className="btn" disabled={mutation.isPending}>
-          {mutation.isPending ? "Guardando..." : initialAppointment ? "Actualizar cita" : "Crear cita"}
-        </button>
-      </div>
+      <button className="btn" disabled={mutation.isPending}>
+        {mutation.isPending ? "Guardando..." : initialAppointment ? "Actualizar cita" : "Crear cita"}
+      </button>
     </form>
   );
 }

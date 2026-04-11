@@ -3,6 +3,11 @@
   "compilerOptions": {
     "jsx": "react-jsx"
   },
-  "include": ["app", "components", "lib", "expo-env.d.ts"]
+  "include": [
+    "app",
+    "components",
+    "lib",
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
+  ]
 }
-

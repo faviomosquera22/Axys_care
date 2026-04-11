@@ -6,10 +6,9 @@ export default function RegisterPage() {
     <div className="auth-shell">
       <Card className="auth-card">
         <h1>Registro inicial</h1>
-        <p>Crea la cuenta base para configurar perfil profesional y empezar a operar Axyscare.</p>
+        <p>Crea tu acceso y deja lista la base para atender, documentar y compartir contexto clínico con orden.</p>
         <RegisterForm />
       </Card>
     </div>
   );
 }
-

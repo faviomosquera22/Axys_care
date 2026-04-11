@@ -5,8 +5,11 @@
   "packageManager": "pnpm@10.24.0",
   "scripts": {
     "dev": "turbo dev",
-    "dev:web": "turbo dev --filter=@axyscare/web",
-    "dev:mobile": "turbo dev --filter=@axyscare/mobile",
+    "dev:web": "corepack pnpm --filter @axyscare/web dev",
+    "dev:mobile": "corepack pnpm --filter @axyscare/mobile dev",
+    "mobile:ios": "corepack pnpm --filter @axyscare/mobile ios:device",
+    "mobile:ios:release": "corepack pnpm --filter @axyscare/mobile ios:release:device",
+    "mobile:start:dev-client": "corepack pnpm --filter @axyscare/mobile start:dev-client",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",

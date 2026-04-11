@@ -290,22 +290,6 @@ export async function upsertPatient(client: SupabaseClient, input: PatientInput 
   return fromPatientRow(row);
 }
 
-export async function deletePatient(client: SupabaseClient, patientId: string) {
-  const actorUserId = await getCurrentUserId(client);
-  if (!actorUserId) throw new Error("No hay sesión activa.");
-
-  const row = await unwrap(
-    client
-      .from("patients")
-      .delete()
-      .eq("id", patientId)
-      .select("*")
-      .single(),
-  );
-
-  return fromPatientRow(row, { relationshipToViewer: "owner" });
-}
-
 export async function listAppointments(client: SupabaseClient, from?: string, to?: string) {
   let query = client.from("appointments").select("*").order("start_at", { ascending: true });
   if (from) query = query.gte("start_at", from);
@@ -397,6 +381,30 @@ export async function createEncounterFromAppointment(client: SupabaseClient, app
     chiefComplaint: appointment.reason,
     startedAt: appointment.startAt,
   });
+}
+
+export async function closeEncounter(
+  client: SupabaseClient,
+  input: { encounterId: string; summary?: string | null; endedAt?: string },
+) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+
+  const row = await unwrap(
+    client
+      .from("encounters")
+      .update({
+        status: "closed",
+        ended_at: input.endedAt ?? new Date().toISOString(),
+        summary: input.summary ?? null,
+        updated_by: actorUserId,
+      })
+      .eq("id", input.encounterId)
+      .select()
+      .single(),
+  );
+
+  return fromEncounterRow(row);
 }
 
 export async function listEncounters(client: SupabaseClient, patientId?: string) {

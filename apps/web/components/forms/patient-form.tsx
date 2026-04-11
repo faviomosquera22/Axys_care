@@ -9,7 +9,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
-import { useAuth } from "@/components/providers/providers";
+import { trackUIEvent } from "@/lib/client-analytics";
+import { useAuth, useUI } from "@/components/providers/providers";
 
 type PatientFormValues = PatientInput & { allergies: string[] };
 
@@ -21,6 +22,7 @@ export function PatientForm({
   onSaved?: (patient: Patient) => void;
 }) {
   const { client } = useAuth();
+  const { notify } = useUI();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -84,6 +86,11 @@ export function PatientForm({
     onSuccess: (patient) => {
       setServerError(null);
       setSuccessMessage(initialPatient ? "Paciente actualizado correctamente." : "Paciente creado correctamente.");
+      notify({
+        tone: "success",
+        message: initialPatient ? "Paciente actualizado." : "Paciente creado y listo para continuar.",
+      });
+      trackUIEvent(initialPatient ? "patient_update" : "patient_create", patient.id);
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       onSaved?.(patient);
       if (!initialPatient) {
@@ -92,7 +99,9 @@ export function PatientForm({
     },
     onError: (error) => {
       setSuccessMessage(null);
-      setServerError(error instanceof Error ? error.message : "No se pudo guardar el paciente.");
+      const message = error instanceof Error ? error.message : "No se pudo guardar el paciente.";
+      setServerError(message);
+      notify({ tone: "error", message });
     },
   });
 
@@ -114,7 +123,11 @@ export function PatientForm({
             ))}
           </select>
         </FormField>
-        <FormField label="Documento" error={form.formState.errors.documentNumber?.message}>
+        <FormField
+          label="Documento"
+          error={form.formState.errors.documentNumber?.message}
+          helper="Usa el número principal con el que identificarás la ficha."
+        >
           <input {...form.register("documentNumber")} />
         </FormField>
         <FormField label="Fecha de nacimiento" error={form.formState.errors.birthDate?.message}>
@@ -139,10 +152,14 @@ export function PatientForm({
             ))}
           </select>
         </FormField>
-        <FormField label="Teléfono">
+        <FormField label="Teléfono" helper="Útil para seguimiento, confirmaciones y recordatorios.">
           <input {...form.register("phone")} />
         </FormField>
-        <FormField label="Correo del paciente" error={form.formState.errors.email?.message}>
+        <FormField
+          label="Correo del paciente"
+          error={form.formState.errors.email?.message}
+          helper="Si existe, servirá para agenda y recordatorios por Calendar."
+        >
           <input type="email" placeholder="nombre@correo.com" {...form.register("email")} />
         </FormField>
       </div>
@@ -166,6 +183,7 @@ export function PatientForm({
       <FormField label="Antecedentes relevantes">
         <textarea {...form.register("relevantHistory")} />
       </FormField>
+      {mutation.isPending ? <FormStatusMessage tone="loading" message="Guardando datos del paciente..." /> : null}
       {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
       {serverError ? <div className="form-error">{serverError}</div> : null}
       <button className="btn" disabled={mutation.isPending}>

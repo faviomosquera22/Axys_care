@@ -42,4 +42,5 @@ Base clínica unificada para web y app móvil con `Next.js + Expo + Supabase`, o
 - [Arquitectura](/Users/Apple/Desktop/AXYSCARE/docs/architecture.md)
 - [Ejecución](/Users/Apple/Desktop/AXYSCARE/docs/runbook.md)
 - [Colaboración clínica](/Users/Apple/Desktop/AXYSCARE/docs/collaboration.md)
+- [Roadmap UX/UI](/Users/Apple/Desktop/AXYSCARE/docs/ux-roadmap.md)
 - [Supabase RLS](/Users/Apple/Desktop/AXYSCARE/supabase/policies/README.md)

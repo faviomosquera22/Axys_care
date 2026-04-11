@@ -2,17 +2,18 @@
 
 import { calculateAge } from "@axyscare/core-clinical";
 import type { Patient } from "@axyscare/core-types";
-import { deletePatient, listPatients, searchProfessionals, sharePatient } from "@axyscare/core-db";
-import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
+import { listPatients } from "@axyscare/core-db";
+import { Card, LoadingStateCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PatientForm } from "@/components/forms/patient-form";
+import { PatientSharePanel } from "@/components/forms/patient-share-panel";
 import { useAuth } from "@/components/providers/providers";
 import { useTableRealtime } from "@/components/realtime/use-table-realtime";
 
-function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" | "delete" }) {
+function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
   if (kind === "open") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -32,15 +33,7 @@ function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" | "dele
   if (kind === "share") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M15.7 8.1a3.5 3.5 0 1 0-1.3-2.7c0 .2 0 .4.1.6L8.8 9.1a3.5 3.5 0 1 0 0 5.8l5.7 3.1a3.1 3.1 0 0 0-.1.7 3.5 3.5 0 1 0 1.1-2.5l-5.9-3.2a3.6 3.6 0 0 0 0-1.8l6.1-3.1Z" />
-      </svg>
-    );
-  }
-
-  if (kind === "delete") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h10l-.7 10.2A2 2 0 0 1 14.3 21H9.7a2 2 0 0 1-2-1.8L7 9Zm3 2v7h2v-7h-2Zm4 0v7h2v-7h-2Z" />
+        <path d="M16 5a3 3 0 1 1-.1 6 3 3 0 0 1 .1-6ZM6 9a3 3 0 1 1-.1 6A3 3 0 0 1 6 9Zm10 4a3 3 0 1 1-.1 6 3 3 0 0 1 .1-6Zm-7.4.7 4.8 2.4.9-1.8-4.8-2.4-.9 1.8Zm.2-2 4.6-2.8-1-1.7-4.6 2.8 1 1.7Z" />
       </svg>
     );
   }
@@ -55,80 +48,42 @@ function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" | "dele
 export default function PatientsPage() {
   const { client } = useAuth();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"all" | "owners" | "shared">("all");
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [sharingPatient, setSharingPatient] = useState<Patient | null>(null);
-  const [shareSearch, setShareSearch] = useState("");
-  const [selectedProfessionalId, setSelectedProfessionalId] = useState("");
-  const [permissionLevel, setPermissionLevel] = useState<"read" | "edit">("read");
   const deferredSearch = useDeferredValue(search);
-  const deferredShareSearch = useDeferredValue(shareSearch);
   const patientsQuery = useQuery({
     queryKey: ["patients", deferredSearch],
     queryFn: () => listPatients(client, deferredSearch),
   });
-  const professionalsQuery = useQuery({
-    queryKey: ["professional-search", "patients-page", deferredShareSearch],
-    queryFn: () => searchProfessionals(client, deferredShareSearch),
-    enabled: Boolean(sharingPatient) && deferredShareSearch.trim().length >= 2,
-  });
   const patients = patientsQuery.data ?? [];
   const ownedCount = patients.filter((patient) => patient.relationshipToViewer === "owner").length;
   const sharedCount = patients.filter((patient) => patient.relationshipToViewer !== "owner").length;
-  const selectedProfessional = useMemo(
-    () => professionalsQuery.data?.find((professional) => professional.id === selectedProfessionalId) ?? null,
-    [professionalsQuery.data, selectedProfessionalId],
-  );
+  const filteredPatients = useMemo(() => {
+    if (view === "owners") {
+      return patients.filter((patient) => patient.relationshipToViewer === "owner");
+    }
 
-  const shareMutation = useMutation({
-    mutationFn: async () => {
-      if (!sharingPatient || !selectedProfessionalId) {
-        throw new Error("Selecciona un usuario por correo antes de compartir.");
-      }
+    if (view === "shared") {
+      return patients.filter((patient) => patient.relationshipToViewer !== "owner");
+    }
 
-      return sharePatient(client, {
-        patientId: sharingPatient.id,
-        sharedWithUserId: selectedProfessionalId,
-        permissionLevel,
-        status: "active",
-        expiresAt: null,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["patients", deferredSearch] });
-      queryClient.invalidateQueries({ queryKey: ["patients-shared-with-me"] });
-      queryClient.invalidateQueries({ queryKey: ["patients-shared-by-me"] });
-      if (sharingPatient) {
-        queryClient.invalidateQueries({ queryKey: ["patient-access", sharingPatient.id] });
-      }
-      setShareSearch("");
-      setSelectedProfessionalId("");
-      setPermissionLevel("read");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (patientId: string) => deletePatient(client, patientId),
-    onSuccess: (_, deletedPatientId) => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["patients", deferredSearch] });
-      queryClient.invalidateQueries({ queryKey: ["patient", deletedPatientId] });
-      queryClient.invalidateQueries({ queryKey: ["encounters", deletedPatientId] });
-      queryClient.invalidateQueries({ queryKey: ["patient-access", deletedPatientId] });
-      queryClient.invalidateQueries({ queryKey: ["patients-shared-with-me"] });
-      queryClient.invalidateQueries({ queryKey: ["patients-shared-by-me"] });
-      if (editingPatient?.id === deletedPatientId) {
-        setEditingPatient(null);
-      }
-      if (sharingPatient?.id === deletedPatientId) {
-        setSharingPatient(null);
-      }
-    },
-  });
+    return patients;
+  }, [patients, view]);
 
   useTableRealtime("patients-browser", ["patients", "patient_access"], [["patients", deferredSearch]]);
+
+  if (patientsQuery.isLoading) {
+    return (
+      <div className="stack">
+        <LoadingStateCard
+          title="Cargando directorio de pacientes"
+          description="Estamos trayendo el padrón clínico para que puedas buscar, filtrar y continuar la atención."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="stack">
@@ -138,10 +93,14 @@ export default function PatientsPage() {
             <span className="patient-kicker">Directorio clínico</span>
             <h1 className="clinical-hero__title">Pacientes</h1>
             <p className="clinical-hero__subtitle">
-              Busca rápido, revisa edad, correo y teléfono antes de abrir la ficha clínica.
+              Encuentra rápido a quién ver, distingue lo propio de lo compartido y entra a la ficha o
+              a la atención sin cambiar de contexto.
             </p>
           </div>
           <div className="clinical-hero__actions">
+            <Link href="/nueva-atencion" className="btn">
+              Nueva atención
+            </Link>
             <button type="button" className="btn secondary" onClick={() => window.print()}>
               Imprimir listado
             </button>
@@ -167,17 +126,32 @@ export default function PatientsPage() {
         </div>
       </section>
 
+      <section className="onboarding-panel">
+        <div className="onboarding-panel__card">
+          <strong>Busca primero</strong>
+          <p>Antes de crear un registro nuevo, confirma si el paciente ya existe en tu base o fue compartido.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Abre contexto</strong>
+          <p>La ficha es el centro para historia, colaboración, documentos y la siguiente atención.</p>
+        </div>
+        <div className="onboarding-panel__card">
+          <strong>Activa seguimiento</strong>
+          <p>Desde aquí deberías poder atender, reagendar o compartir sin duplicar trabajo.</p>
+        </div>
+      </section>
+
       <Card className="workflow-banner">
         <div className="workflow-banner__step">
-          <strong>1. Registrar paciente</strong>
+          <strong>1. Registrar o ubicar</strong>
           <span>Demografía, antecedentes y datos base.</span>
         </div>
         <div className="workflow-banner__step">
-          <strong>2. Abrir ficha</strong>
+          <strong>2. Revisar contexto</strong>
           <span>Resumen clínico, colaboración y línea temporal.</span>
         </div>
         <div className="workflow-banner__step">
-          <strong>3. Iniciar atención</strong>
+          <strong>3. Actuar</strong>
           <span>Encounter, signos vitales, nota médica o de enfermería.</span>
         </div>
       </Card>
@@ -187,7 +161,7 @@ export default function PatientsPage() {
       <Card>
         <SectionHeading
           title="Base de pacientes"
-          description="Listado clínico rápido con acceso directo a ficha y atención."
+          description="Listado operativo con foco en continuidad, no solo en almacenamiento."
           action={
             <input
               placeholder="Buscar por nombre, documento o correo"
@@ -196,7 +170,26 @@ export default function PatientsPage() {
             />
           }
         />
-        {patients.length ? (
+        <div className="filter-row">
+          <button type="button" className={`filter-chip ${view === "all" ? "active" : ""}`} onClick={() => setView("all")}>
+            Todos
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${view === "owners" ? "active" : ""}`}
+            onClick={() => setView("owners")}
+          >
+            Propios
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${view === "shared" ? "active" : ""}`}
+            onClick={() => setView("shared")}
+          >
+            Compartidos
+          </button>
+        </div>
+        {filteredPatients.length ? (
           <div className="patient-directory">
             <div className="patient-directory__head">
               <span>Paciente</span>
@@ -206,7 +199,7 @@ export default function PatientsPage() {
               <span>Acceso</span>
               <span>Acciones</span>
             </div>
-            {patients.map((patient) => (
+            {filteredPatients.map((patient) => (
               <div key={patient.id} className="patient-directory__row">
                 <div className="patient-directory__identity">
                   <strong>
@@ -240,31 +233,13 @@ export default function PatientsPage() {
                     <ActionIcon kind="care" />
                     <span>Atender</span>
                   </Link>
-                  {patient.relationshipToViewer === "owner" ? (
-                    <button
-                      type="button"
-                      className="action-pill action-pill--share"
-                      title="Compartir paciente"
-                      onClick={() => {
-                        setEditingPatient(null);
-                        setSharingPatient(patient);
-                        setShareSearch("");
-                        setSelectedProfessionalId("");
-                        setPermissionLevel("read");
-                        shareMutation.reset();
-                      }}
-                    >
-                      <ActionIcon kind="share" />
-                      <span>Compartir</span>
-                    </button>
-                  ) : null}
                   <button
                     type="button"
                     className="action-pill action-pill--edit"
                     title="Editar paciente"
                     onClick={() => {
-                      setSharingPatient(null);
                       setEditingPatient(patient);
+                      setSharingPatient(null);
                     }}
                   >
                     <ActionIcon kind="edit" />
@@ -273,23 +248,15 @@ export default function PatientsPage() {
                   {patient.relationshipToViewer === "owner" ? (
                     <button
                       type="button"
-                      className="action-pill action-pill--danger"
-                      title="Eliminar paciente"
-                      disabled={deleteMutation.isPending}
+                      className="action-pill action-pill--share"
+                      title="Compartir paciente"
                       onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Eliminar a ${patient.firstName} ${patient.lastName} borrará citas, encounters y accesos compartidos asociados. Esta acción no se puede deshacer. ¿Continuar?`,
-                          )
-                        ) {
-                          return;
-                        }
-
-                        deleteMutation.mutate(patient.id);
+                        setSharingPatient(patient);
+                        setEditingPatient(null);
                       }}
                     >
-                      <ActionIcon kind="delete" />
-                      <span>Eliminar</span>
+                      <ActionIcon kind="share" />
+                      <span>Compartir</span>
                     </button>
                   ) : null}
                 </div>
@@ -298,115 +265,16 @@ export default function PatientsPage() {
           </div>
         ) : (
           <div className="empty-state">
-            <strong>Aún no tienes pacientes registrados.</strong>
-            <p>Empieza por crear uno en el panel derecho. Cuando se guarde, la ficha será el punto central para toda la atención.</p>
+            <strong>No hay pacientes para este filtro.</strong>
+            <p>
+              Ajusta la búsqueda o crea un nuevo registro desde el panel lateral. La ficha quedará
+              lista para continuidad clínica.
+            </p>
           </div>
         )}
       </Card>
       </div>
       <aside className="clinical-layout__side stack">
-      {sharingPatient ? (
-      <Card>
-        <SectionHeading
-          title={`Compartir a ${sharingPatient.firstName} ${sharingPatient.lastName}`}
-          description="Escribe el correo del otro usuario del sistema y selecciónalo para que el paciente aparezca en sus compartidos."
-        />
-        <div className="stack">
-          <label className="stack" style={{ gap: 8 }}>
-            <span className="field-label">Correo del profesional</span>
-            <input
-              placeholder="correo@dominio.com"
-              value={shareSearch}
-              onChange={(event) => {
-                setShareSearch(event.target.value);
-                setSelectedProfessionalId("");
-                shareMutation.reset();
-              }}
-            />
-          </label>
-
-          <label className="stack" style={{ gap: 8 }}>
-            <span className="field-label">Permiso</span>
-            <select
-              value={permissionLevel}
-              onChange={(event) => setPermissionLevel(event.target.value as "read" | "edit")}
-            >
-              <option value="read">read</option>
-              <option value="edit">edit</option>
-            </select>
-          </label>
-
-          {shareSearch.trim().length >= 2 ? (
-            <div className="stack">
-              {(professionalsQuery.data ?? []).length ? (
-                (professionalsQuery.data ?? []).map((professional) => (
-                  <button
-                    key={professional.id}
-                    type="button"
-                    className={`picker-row ${selectedProfessional?.id === professional.id ? "selected" : ""}`}
-                    onClick={() => setSelectedProfessionalId(professional.id)}
-                  >
-                    <strong>
-                      {professional.firstName} {professional.lastName}
-                    </strong>
-                    <span>
-                      {professional.profession} · {professional.email}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className="info-panel">
-                  <strong>No encontramos un usuario con ese correo.</strong>
-                  <span>Verifica el correo o pide al profesional que tenga cuenta creada en el sistema.</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="info-panel">
-              <strong>Cómo funciona</strong>
-              <span>Empieza escribiendo el correo del otro usuario. Cuando aparezca en la lista, selecciónalo y comparte el paciente.</span>
-            </div>
-          )}
-
-          {shareMutation.error ? (
-            <div className="form-error">
-              {shareMutation.error instanceof Error ? shareMutation.error.message : "No se pudo compartir el paciente."}
-            </div>
-          ) : null}
-
-          {shareMutation.isSuccess ? (
-            <div className="info-panel">
-              <strong>Paciente compartido</strong>
-              <span>El usuario seleccionado ya debería verlo en su bandeja de pacientes compartidos.</span>
-            </div>
-          ) : null}
-
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn"
-              disabled={shareMutation.isPending || !selectedProfessionalId}
-              onClick={() => shareMutation.mutate()}
-            >
-              {shareMutation.isPending ? "Compartiendo..." : "Compartir paciente"}
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => {
-                setSharingPatient(null);
-                setShareSearch("");
-                setSelectedProfessionalId("");
-                setPermissionLevel("read");
-                shareMutation.reset();
-              }}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </Card>
-      ) : null}
       <Card>
         <SectionHeading
           title={editingPatient ? "Editar paciente" : "Nuevo paciente"}
@@ -423,7 +291,6 @@ export default function PatientsPage() {
               setEditingPatient(null);
               return;
             }
-            setSharingPatient(null);
             startTransition(() => router.push(`/pacientes/${patient.id}`));
           }}
         />
@@ -437,24 +304,33 @@ export default function PatientsPage() {
             </Link>
           </div>
         ) : null}
-        {deleteMutation.error ? (
-          <div className="form-error">
-            {deleteMutation.error instanceof Error
-              ? deleteMutation.error.message
-              : "No se pudo eliminar el paciente."}
-          </div>
-        ) : null}
         <div className="info-panel">
           <strong>Qué sigue después</strong>
           <span>
-            {sharingPatient
-              ? "Comparte el paciente por correo y el otro profesional lo verá en su módulo de compartidos."
-              : editingPatient
+            {editingPatient
               ? "Guarda los cambios y el listado reflejará los datos actualizados del paciente."
               : "La ficha del paciente te llevará a historia clínica, colaboración y apertura ordenada de una nueva atención."}
           </span>
         </div>
       </Card>
+
+      {sharingPatient ? (
+        <Card>
+          <SectionHeading
+            title={`Compartir a ${sharingPatient.firstName} ${sharingPatient.lastName}`}
+            description="Busca al profesional por correo, nombre o profesión. Solo se comparte dentro de cuentas ya registradas en Axyscare."
+          />
+          <PatientSharePanel patientId={sharingPatient.id} ownerUserId={sharingPatient.ownerUserId} />
+          <div className="btn-row" style={{ marginTop: 12 }}>
+            <button type="button" className="btn secondary" onClick={() => setSharingPatient(null)}>
+              Cerrar panel
+            </button>
+            <Link href={`/pacientes/${sharingPatient.id}`} className="pill-link">
+              Abrir ficha
+            </Link>
+          </div>
+        </Card>
+      ) : null}
       </aside>
       </div>
     </div>
