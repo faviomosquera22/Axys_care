@@ -252,6 +252,21 @@ export async function getPatient(client: SupabaseClient, patientId: string) {
   return fromPatientRow(row);
 }
 
+export async function deletePatient(client: SupabaseClient, patientId: string) {
+  const actorUserId = await getCurrentUserId(client);
+  if (!actorUserId) throw new Error("No hay sesión activa.");
+
+  const patient = await getPatient(client, patientId);
+  if (patient.ownerUserId !== actorUserId) {
+    throw new Error("Solo el propietario puede eliminar este paciente.");
+  }
+
+  const row = await unwrap(
+    client.from("patients").delete().eq("id", patientId).select("*").single(),
+  );
+  return fromPatientRow(row);
+}
+
 export async function getEncounter(client: SupabaseClient, encounterId: string) {
   const row = await unwrap(client.from("encounters").select("*").eq("id", encounterId).single());
   const profiles = await getProfilesMap(client, [row.created_by, row.updated_by].filter(Boolean) as string[]);
