@@ -11,49 +11,38 @@ import { useForm } from "react-hook-form";
 import { Card, SectionHeading } from "@axyscare/ui-shared";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { SignatureField } from "@/components/forms/signature-field";
+import {
+  buildSealDataUrl,
+  getDefaultSealVariant,
+  parseSealMetadata,
+  sealAccentOptions,
+  sealVariantOptions,
+  type SealAccent,
+  type SealVariant,
+} from "@/lib/professional-seal";
 import { useAuth } from "@/components/providers/providers";
 
-function buildSealDataUrl({
-  firstName,
-  lastName,
-  profession,
-  specialty,
-  professionalLicense,
-}: {
-  firstName: string;
-  lastName: string;
-  profession: string;
-  specialty?: string | null;
-  professionalLicense: string;
-}) {
-  const issuedAt = new Intl.DateTimeFormat("es-EC", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date());
-  const lines = [
-    `${firstName} ${lastName}`.trim() || "Profesional",
-    specialty ? `${profession} · ${specialty}` : profession || "Profesión",
-    `Registro: ${professionalLicense || "PENDIENTE"}`,
-    `Fecha: ${issuedAt}`,
-  ];
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="240" viewBox="0 0 720 240">
-      <rect x="10" y="10" width="700" height="220" rx="28" fill="#fffaf4" stroke="#8f5a3c" stroke-width="6" />
-      <rect x="26" y="26" width="668" height="188" rx="20" fill="none" stroke="#156669" stroke-width="2" stroke-dasharray="10 8" />
-      <text x="360" y="82" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#211b16">${lines[0]}</text>
-      <text x="360" y="122" text-anchor="middle" font-size="24" font-family="Georgia, serif" fill="#156669">${lines[1]}</text>
-      <text x="360" y="158" text-anchor="middle" font-size="22" font-family="Georgia, serif" fill="#5d5247">${lines[2]}</text>
-      <text x="360" y="192" text-anchor="middle" font-size="20" font-family="Georgia, serif" fill="#5d5247">${lines[3]}</text>
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+const genericProfessions = new Set(["", "Profesional", "Pendiente"]);
+
+const professionSuggestionsByRole: Record<ProfessionalProfileInput["role"], string[]> = {
+  admin: ["Administración clínica", "Coordinación clínica", "Gestión operativa"],
+  medico: ["Medicina General", "Medicina Interna", "Pediatría", "Ginecología", "Medicina Familiar"],
+  psicologo: ["Psicología", "Psicología clínica", "Psicología infantil", "Neuropsicología"],
+  enfermeria: ["Enfermería", "Licenciatura en Enfermería", "Enfermería clínica", "Enfermería comunitaria"],
+  nutricion: ["Nutrición", "Nutrición clínica", "Nutrición deportiva", "Nutrición pediátrica"],
+  profesional_mixto: ["Profesional mixto", "Atención integral", "Coordinación clínica"],
+};
+
+function isPlaceholderProfession(value?: string | null) {
+  return genericProfessions.has((value ?? "").trim());
 }
 
 export function ProfessionalProfileForm() {
   const { client, user } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [sealVariant, setSealVariant] = useState<SealVariant>("institutional");
+  const [sealAccent, setSealAccent] = useState<SealAccent>("teal");
   const profileQuery = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: () => getProfile(client, user!.id),
@@ -84,6 +73,9 @@ export function ProfessionalProfileForm() {
   useEffect(() => {
     const profile = profileQuery.data as Profile | null | undefined;
     if (!profile) return;
+    const existingSealMetadata = parseSealMetadata(profile.sealUrl);
+    setSealVariant(existingSealMetadata?.variant ?? getDefaultSealVariant(profile.role));
+    setSealAccent(existingSealMetadata?.accent ?? "teal");
     form.reset({
       firstName: profile.firstName,
       lastName: profile.lastName,
@@ -121,18 +113,23 @@ export function ProfessionalProfileForm() {
   const watchedProfession = form.watch("profession");
   const watchedSpecialty = form.watch("specialty");
   const watchedLicense = form.watch("professionalLicense");
+  const watchedCity = form.watch("city");
+  const watchedSealUrl = form.watch("sealUrl");
   const persistedProfile = profileQuery.data as Profile | null | undefined;
-  const isProfessionLocked = Boolean(persistedProfile?.profession?.trim() && persistedProfile.role);
+  const roleProfessionOptions = professionSuggestionsByRole[watchedRole] ?? [];
+  const isProfessionLocked = Boolean(
+    persistedProfile?.role && persistedProfile.profession?.trim() && !isPlaceholderProfession(persistedProfile.profession),
+  );
 
   useEffect(() => {
     if (isProfessionLocked) return;
 
-    if (watchedRole === "medico" && form.getValues("profession") !== "Medicina General") {
+    if (watchedRole === "medico" && isPlaceholderProfession(form.getValues("profession"))) {
       form.setValue("profession", "Medicina General", { shouldDirty: true });
     }
 
     if (watchedRole === "enfermeria") {
-      if (form.getValues("profession") !== "Enfermería") {
+      if (isPlaceholderProfession(form.getValues("profession"))) {
         form.setValue("profession", "Enfermería", { shouldDirty: true });
       }
 
@@ -142,7 +139,7 @@ export function ProfessionalProfileForm() {
     }
 
     if (watchedRole === "psicologo") {
-      if (form.getValues("profession") !== "Psicología") {
+      if (isPlaceholderProfession(form.getValues("profession"))) {
         form.setValue("profession", "Psicología", { shouldDirty: true });
       }
 
@@ -151,11 +148,21 @@ export function ProfessionalProfileForm() {
       }
     }
 
-    if (watchedRole === "profesional_mixto" && form.getValues("profession") !== "Profesional mixto") {
+    if (watchedRole === "nutricion") {
+      if (isPlaceholderProfession(form.getValues("profession"))) {
+        form.setValue("profession", "Nutrición", { shouldDirty: true });
+      }
+
+      if (!form.getValues("specialty")) {
+        form.setValue("specialty", "Nutrición clínica", { shouldDirty: true });
+      }
+    }
+
+    if (watchedRole === "profesional_mixto" && isPlaceholderProfession(form.getValues("profession"))) {
       form.setValue("profession", "Profesional mixto", { shouldDirty: true });
     }
 
-    if (watchedRole === "admin" && form.getValues("profession") !== "Administración clínica") {
+    if (watchedRole === "admin" && isPlaceholderProfession(form.getValues("profession"))) {
       form.setValue("profession", "Administración clínica", { shouldDirty: true });
     }
   }, [form, isProfessionLocked, watchedRole]);
@@ -168,9 +175,13 @@ export function ProfessionalProfileForm() {
         profession: watchedProfession,
         specialty: watchedSpecialty,
         professionalLicense: watchedLicense,
+        city: watchedCity,
+        variant: sealVariant,
+        accent: sealAccent,
       }),
-    [watchedFirstName, watchedLastName, watchedProfession, watchedSpecialty, watchedLicense],
+    [watchedFirstName, watchedLastName, watchedProfession, watchedSpecialty, watchedLicense, watchedCity, sealVariant, sealAccent],
   );
+  const usingCustomSeal = Boolean(watchedSealUrl && watchedSealUrl !== sealPreview);
 
   return (
     <Card>
@@ -178,7 +189,15 @@ export function ProfessionalProfileForm() {
         title="Perfil profesional"
         description="Datos usados en atención, impresión y trazabilidad clínica."
       />
-      <form className="stack" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <form
+        className="stack"
+        onSubmit={form.handleSubmit((values) =>
+          mutation.mutate({
+            ...values,
+            sealUrl: values.sealUrl || sealPreview,
+          }),
+        )}
+      >
         <div className="form-grid">
           <FormField label="Nombres" error={form.formState.errors.firstName?.message}>
             <input {...form.register("firstName")} />
@@ -192,14 +211,21 @@ export function ProfessionalProfileForm() {
               <option value="medico">medico</option>
               <option value="psicologo">psicologo</option>
               <option value="enfermeria">enfermeria</option>
+              <option value="nutricion">nutricion</option>
               <option value="profesional_mixto">profesional_mixto</option>
             </select>
           </FormField>
           <FormField label="Profesión">
             <input
               {...form.register("profession")}
-              readOnly
+              list="profession-suggestions"
+              readOnly={isProfessionLocked}
             />
+            <datalist id="profession-suggestions">
+              {roleProfessionOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
           </FormField>
           <FormField label="Especialidad">
             <select {...form.register("specialty")}>
@@ -221,6 +247,19 @@ export function ProfessionalProfileForm() {
             <input {...form.register("phone")} />
           </FormField>
         </div>
+        <div className="profile-form-actions">
+          <div className="profile-form-actions__copy">
+            <strong>Identidad profesional</strong>
+            <span>
+              {isProfessionLocked
+                ? `La profesión quedó confirmada como ${persistedProfile?.profession}.`
+                : "Puedes escoger o escribir una profesión y guardarla desde aquí."}
+            </span>
+          </div>
+          <button className="btn" disabled={mutation.isPending || !user}>
+            {mutation.isPending ? "Guardando..." : "Guardar perfil profesional"}
+          </button>
+        </div>
         <FormField label="Dirección profesional">
           <input {...form.register("professionalAddress")} />
         </FormField>
@@ -230,34 +269,87 @@ export function ProfessionalProfileForm() {
         <FormField label="Firma">
           <SignatureField value={form.watch("signatureUrl")} onChange={(value) => form.setValue("signatureUrl", value ?? "")} />
         </FormField>
-        <FormField label="Sello profesional">
-          <div className="stack">
+        <FormField
+          label="Sello profesional"
+          helper="El sello activo se insertará automáticamente al pie del PDF y del Word descargable."
+        >
+          <div className="seal-workbench">
             <div className="seal-card">
-              <img src={form.watch("sealUrl") || sealPreview} alt="Sello profesional" className="seal-preview" />
+              <div className="seal-card__meta">
+                <strong>{usingCustomSeal ? "Sello personalizado activo" : "Sello automático activo"}</strong>
+                <span>{usingCustomSeal ? "Se respetará el PNG cargado." : "Se genera con los datos del perfil."}</span>
+              </div>
+              <img src={watchedSealUrl || sealPreview} alt="Sello profesional" className="seal-preview" />
             </div>
-            <div className="btn-row">
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => form.setValue("sealUrl", sealPreview)}
-              >
-                Generar sello automático
-              </button>
-              <label className="btn secondary">
-                Subir sello PNG
-                <input
-                  type="file"
-                  accept="image/png"
-                  style={{ display: "none" }}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => form.setValue("sealUrl", String(reader.result ?? ""));
-                    reader.readAsDataURL(file);
-                  }}
-                />
-              </label>
+            <div className="seal-tools">
+              <div className="seal-tool-group">
+                <span className="seal-tool-label">Estilo</span>
+                <div className="seal-choice-grid">
+                  {sealVariantOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`seal-choice ${sealVariant === option.value ? "is-active" : ""}`}
+                      onClick={() => setSealVariant(option.value)}
+                    >
+                      <strong>{option.label}</strong>
+                      <span>{option.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="seal-tool-group">
+                <span className="seal-tool-label">Acento</span>
+                <div className="seal-tone-row">
+                  {sealAccentOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`seal-tone ${sealAccent === option.value ? "is-active" : ""}`}
+                      data-tone={option.value}
+                      onClick={() => setSealAccent(option.value)}
+                    >
+                      <span className="seal-tone__swatch" />
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="info-panel">
+                <strong>Aplicación automática</strong>
+                <span>La firma y el sello se adjuntan al cierre del documento exportado cuando estén cargados en el perfil.</span>
+              </div>
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => form.setValue("sealUrl", sealPreview, { shouldDirty: true })}
+                >
+                  Aplicar sello automático
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => form.setValue("sealUrl", "", { shouldDirty: true })}
+                >
+                  Quitar personalizado
+                </button>
+                <label className="btn secondary">
+                  Subir sello PNG
+                  <input
+                    type="file"
+                    accept="image/png"
+                    style={{ display: "none" }}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => form.setValue("sealUrl", String(reader.result ?? ""), { shouldDirty: true });
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
         </FormField>
@@ -276,19 +368,22 @@ export function ProfessionalProfileForm() {
             <span>La profesión se fija automáticamente como Psicología para activar el flujo clínico orientado a salud mental.</span>
           </div>
         ) : null}
+        {watchedRole === "nutricion" ? (
+          <div className="info-panel">
+            <strong>Perfil de nutrición</strong>
+            <span>La profesión se fija automáticamente como Nutrición para mantener el flujo de evaluación, diagnóstico alimentario y plan nutricional.</span>
+          </div>
+        ) : null}
         {isProfessionLocked ? (
           <div className="info-panel">
             <strong>Profesión bloqueada</strong>
             <span>
-              Este profesional ya fue dado de alta como {persistedProfile?.profession}. Para evitar inconsistencias clínicas, el rol y la profesión ya no se pueden cambiar.
+              Este profesional ya fue confirmado como {persistedProfile?.profession}. Si necesitas cambiarlo después, habría que hacerlo como ajuste administrativo controlado.
             </span>
           </div>
         ) : null}
         {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
         {serverError ? <div className="form-error">{serverError}</div> : null}
-        <button className="btn" disabled={mutation.isPending || !user}>
-          {mutation.isPending ? "Guardando..." : "Guardar perfil"}
-        </button>
       </form>
     </Card>
   );

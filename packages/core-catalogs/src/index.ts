@@ -8,6 +8,11 @@ export const specialties = [
   "Medicina general",
   "Enfermería clínica",
   "Psicología clínica",
+  "Nutrición clínica",
+  "Nutrición deportiva",
+  "Nutrición pediátrica",
+  "Nutrición renal",
+  "Nutrición oncológica",
   "Pediatría",
   "Ginecología",
   "Medicina interna",
@@ -196,6 +201,34 @@ export const psychologyCatalog = [
     code: "PSY-STR",
     label: "Respuesta clínica asociada a estrés agudo",
     audience: ["psicologo", "profesional_mixto"] as UserRole[],
+  },
+] as const;
+
+export const nutritionCatalog = [
+  {
+    code: "NUT-OB1",
+    label: "Exceso de ingesta energética con objetivo de reducción ponderal",
+    audience: ["nutricion", "profesional_mixto"] as UserRole[],
+  },
+  {
+    code: "NUT-DM2",
+    label: "Plan de alimentación para diabetes mellitus tipo 2",
+    audience: ["nutricion", "profesional_mixto"] as UserRole[],
+  },
+  {
+    code: "NUT-DLP",
+    label: "Intervención nutricional para dislipidemia",
+    audience: ["nutricion", "profesional_mixto"] as UserRole[],
+  },
+  {
+    code: "NUT-HTA",
+    label: "Manejo dietético para hipertensión arterial",
+    audience: ["nutricion", "profesional_mixto"] as UserRole[],
+  },
+  {
+    code: "NUT-SGI",
+    label: "Orientación nutricional para síntomas gastrointestinales",
+    audience: ["nutricion", "profesional_mixto"] as UserRole[],
   },
 ] as const;
 

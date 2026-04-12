@@ -17,7 +17,7 @@ export const loginSchema = z.object({
 export const professionalProfileSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
-  role: z.enum(["admin", "medico", "psicologo", "enfermeria", "profesional_mixto"]),
+  role: z.enum(["admin", "medico", "psicologo", "enfermeria", "nutricion", "profesional_mixto"]),
   profession: z.string().min(2),
   specialty: z.string().optional().nullable(),
   professionalLicense: z.string().min(3),

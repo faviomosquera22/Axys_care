@@ -3,11 +3,12 @@
 import { calculateAge } from "@axyscare/core-clinical";
 import { getPatient, getProfile, signOut } from "@axyscare/core-db";
 import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/providers";
 
-type RoleKey = "admin" | "medico" | "psicologo" | "enfermeria" | "profesional_mixto";
+type RoleKey = "admin" | "medico" | "psicologo" | "enfermeria" | "nutricion" | "profesional_mixto";
 
 type NavEntry =
   | { type: "title"; label: string }
@@ -25,6 +26,7 @@ const professionOptions: { role: RoleKey; shortLabel: string }[] = [
   { role: "medico", shortLabel: "Medico" },
   { role: "enfermeria", shortLabel: "Enferm." },
   { role: "psicologo", shortLabel: "Psico." },
+  { role: "nutricion", shortLabel: "Nutri." },
   { role: "profesional_mixto", shortLabel: "Mixto" },
 ];
 
@@ -65,6 +67,25 @@ function getRolePreset(role?: string, profession?: string) {
         { type: "item", href: "/examenes", icon: "🔍", label: "Diagnóstico" },
         { type: "item", href: "/nueva-atencion", icon: "🎯", label: "Plan terapéutico" },
         { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+      ] satisfies NavEntry[],
+    };
+  }
+
+  if (currentRole === "nutricion") {
+    return {
+      role: currentRole,
+      topbarLabel: `🥗 ${profession || "Nutrición"}`,
+      topbarClassName: "prof-tag prof-nutricion",
+      sidebarRoleLabel: `${profession || "Nutrición"} · AxysCare`,
+      nav: [
+        { type: "item", href: "/dashboard", icon: "🏠", label: "Inicio" },
+        { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
+        { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
+        { type: "title", label: "NUTRICION" },
+        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
+        { type: "item", href: "/nueva-atencion", icon: "🥗", label: "Evaluación nutricional" },
+        { type: "item", href: "/examenes", icon: "📏", label: "Indicadores y exámenes" },
+        { type: "item", href: "/documentos", icon: "📝", label: "Plan alimentario" },
       ] satisfies NavEntry[],
     };
   }
@@ -261,9 +282,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="shell-layout">
       <aside className="shell-sidebar">
         <div className="shell-sidebar__brand">
-          <div className="shell-sidebar__logo">Ax</div>
+          <div className="shell-sidebar__logo">
+            <Image
+              src="/branding/axyscare-icon.png"
+              alt="AxysCare icono"
+              width={44}
+              height={44}
+              className="shell-sidebar__logo-image"
+              priority
+            />
+          </div>
           <div className="brand brand--header">
-            <strong>Axys<span>Care</span></strong>
+            <Image
+              src="/branding/axyscare-logo.png"
+              alt="AxysCare"
+              width={180}
+              height={44}
+              className="shell-sidebar__wordmark"
+              priority
+            />
             <span>Historia clínica digital</span>
           </div>
         </div>
@@ -296,7 +333,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="nav-item__icon" aria-hidden="true">
                   {entry.icon}
                 </span>
-                <span className="nav-dot" />
                 <span>{entry.label}</span>
                 {"badge" in entry && entry.badge ? <span className="nav-badge">{entry.badge}</span> : null}
               </Link>

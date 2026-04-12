@@ -121,7 +121,8 @@ function buildTimelineItems(bundle: EncounterBundle) {
       tone:
         note.noteKind === "patient_indications" ||
         note.noteKind === "nursing_care_plan" ||
-        note.noteKind === "psychology_plan"
+        note.noteKind === "psychology_plan" ||
+        note.noteKind === "nutrition_plan"
           ? "success"
           : "neutral",
       timestamp: note.createdAt ?? "",

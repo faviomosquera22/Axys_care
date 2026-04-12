@@ -6,6 +6,7 @@ import {
   icd10Catalog,
   internalNursingSuggestionCatalog,
   medicationCatalog,
+  nutritionCatalog,
   psychologyCatalog,
 } from "@axyscare/core-catalogs";
 import type {
@@ -46,6 +47,7 @@ import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { EncounterSummaryDocument } from "@/components/pdf/encounter-summary-document";
+import { downloadEncounterSummaryWord } from "@/lib/encounter-summary-word";
 import { useAuth } from "@/components/providers/providers";
 import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
@@ -94,12 +96,14 @@ function normalizeSearch(value: string) {
 function inferDiagnosisSource(role: UserRole) {
   if (role === "enfermeria") return "nursing_pae" as const;
   if (role === "psicologo") return "psychology_dsm5_ready" as const;
+  if (role === "nutricion") return "nutrition_care" as const;
   return "medical_icd10" as const;
 }
 
 function inferPlanNoteKind(role: UserRole) {
   if (role === "enfermeria") return "nursing_care_plan" as const;
   if (role === "psicologo") return "psychology_plan" as const;
+  if (role === "nutricion") return "nutrition_plan" as const;
   return "patient_indications" as const;
 }
 
@@ -454,6 +458,15 @@ export function EncounterWorkspace({
   const supportsNursing =
     selectedEncounterType === "nursing" || selectedEncounterType === "mixed";
   const activeRole = professional?.role ?? "medico";
+
+  useEffect(() => {
+    if (activeEncounter) return;
+
+    if (activeRole === "nutricion" && encounterForm.getValues("encounterType") !== "medical") {
+      encounterForm.setValue("encounterType", "medical");
+    }
+  }, [activeEncounter, activeRole, encounterForm]);
+
   const diagnosisSource = inferDiagnosisSource(activeRole);
   const canPrescribeMedication =
     activeRole === "medico" || activeRole === "profesional_mixto";
@@ -471,6 +484,14 @@ export function EncounterWorkspace({
         code: item.code,
         label: item.label,
         meta: "Catálogo interno DSM-ready",
+      }));
+    }
+
+    if (activeRole === "nutricion") {
+      return nutritionCatalog.map((item) => ({
+        code: item.code,
+        label: item.label,
+        meta: "Diagnóstico e intervención nutricional",
       }));
     }
 
@@ -536,6 +557,7 @@ export function EncounterWorkspace({
           "patient_indications",
           "nursing_care_plan",
           "psychology_plan",
+          "nutrition_plan",
         ].includes(note.noteKind),
       ),
     ),
@@ -733,7 +755,7 @@ export function EncounterWorkspace({
             </FormField>
             <FormField label="Tipo de encuentro">
               <select {...encounterForm.register("encounterType")}>
-                <option value="medical">Médico</option>
+                <option value="medical">{activeRole === "nutricion" ? "Nutricional" : "Médico"}</option>
                 <option value="nursing">Enfermería</option>
                 <option value="mixed">Mixto</option>
               </select>
@@ -1031,17 +1053,23 @@ export function EncounterWorkspace({
                   {supportsMedical ? (
                     <Card>
                       <SectionHeading
-                        title="Formulario médico"
-                        description="Consulta, impresión diagnóstica y plan terapéutico."
+                        title={activeRole === "nutricion" ? "Formulario nutricional" : "Formulario médico"}
+                        description={
+                          activeRole === "nutricion"
+                            ? "Valoración nutricional, diagnóstico alimentario y plan de intervención."
+                            : "Consulta, impresión diagnóstica y plan terapéutico."
+                        }
                       />
                       <form
                         className="stack"
                         onSubmit={medicalForm.handleSubmit(async (values) => {
                           await runAction(
                             {
-                              loading: "Guardando valoración médica...",
+                              loading: activeRole === "nutricion" ? "Guardando valoración nutricional..." : "Guardando valoración médica...",
                               success:
-                                "Valoración médica guardada correctamente.",
+                                activeRole === "nutricion"
+                                  ? "Valoración nutricional guardada correctamente."
+                                  : "Valoración médica guardada correctamente.",
                             },
                             async () => {
                               await saveMedicalAssessment(client, values);
@@ -1051,32 +1079,32 @@ export function EncounterWorkspace({
                           );
                         })}
                       >
-                        <FormField label="Motivo de consulta">
+                        <FormField label={activeRole === "nutricion" ? "Motivo nutricional" : "Motivo de consulta"}>
                           <textarea
                             {...medicalForm.register("chiefComplaint")}
                           />
                         </FormField>
-                        <FormField label="Enfermedad actual">
+                        <FormField label={activeRole === "nutricion" ? "Historia alimentaria actual" : "Enfermedad actual"}>
                           <textarea
                             {...medicalForm.register("currentIllness")}
                           />
                         </FormField>
-                        <FormField label="Impresión diagnóstica">
+                        <FormField label={activeRole === "nutricion" ? "Diagnóstico nutricional" : "Impresión diagnóstica"}>
                           <textarea
                             {...medicalForm.register("diagnosticImpression")}
                           />
                         </FormField>
-                        <FormField label="Plan terapéutico">
+                        <FormField label={activeRole === "nutricion" ? "Plan alimentario y metas" : "Plan terapéutico"}>
                           <textarea
                             {...medicalForm.register("therapeuticPlan")}
                           />
                         </FormField>
                         <button className="btn secondary">
-                          Guardar médico
+                          {activeRole === "nutricion" ? "Guardar nutrición" : "Guardar médico"}
                         </button>
                       </form>
                       <TraceBlock
-                        label="Última edición médica"
+                        label={activeRole === "nutricion" ? "Última edición nutricional" : "Última edición médica"}
                         author={
                           bundle?.medical?.updatedByName ??
                           bundle?.medical?.createdByName
@@ -1161,6 +1189,8 @@ export function EncounterWorkspace({
                           ? "PAE interno y notas de seguimiento."
                           : activeRole === "psicologo"
                             ? "Diagnóstico psicológico con estructura DSM-ready."
+                            : activeRole === "nutricion"
+                              ? "Diagnóstico nutricional, objetivos y seguimiento alimentario."
                             : "CIE-10, razonamiento clínico y notas del encuentro."
                       }
                     />
@@ -1171,6 +1201,8 @@ export function EncounterWorkspace({
                             ? "Diagnóstico de enfermería / PAE"
                             : activeRole === "psicologo"
                               ? "Diagnóstico psicológico (busca por iniciales)"
+                              : activeRole === "nutricion"
+                                ? "Diagnóstico nutricional (busca por objetivo o condición)"
                               : "Diagnóstico CIE-10 (busca por código o iniciales)"
                         }
                       >
@@ -1185,6 +1217,8 @@ export function EncounterWorkspace({
                               ? "Busca plan o respuesta clínica"
                               : activeRole === "psicologo"
                                 ? "Busca referencia interna o describe el cuadro"
+                                : activeRole === "nutricion"
+                                  ? "Busca por objetivo, condición o intervención"
                                 : "Busca por código o nombre"
                           }
                         />
@@ -1310,6 +1344,8 @@ export function EncounterWorkspace({
                                     ? "nursing_followup"
                                     : activeRole === "psicologo"
                                       ? "psychology_plan"
+                                      : activeRole === "nutricion"
+                                        ? "nutrition_followup"
                                       : "medical_followup",
                                 content: noteDraft.trim(),
                               });
@@ -1977,12 +2013,26 @@ export function EncounterWorkspace({
                         ))}
                       </div>
                     ) : null}
+                    {activeRole === "nutricion" ? (
+                      <div className="stack">
+                        <div className="ax-card">
+                          <strong>Checklist nutricional</strong>
+                          <p className="muted">Incluye objetivos calóricos, distribución de comidas, hidratación, educación alimentaria y fecha de reevaluación.</p>
+                        </div>
+                        <div className="ax-card">
+                          <strong>Seguimiento recomendado</strong>
+                          <p className="muted">Registra adherencia, cambios antropométricos, síntomas digestivos y barreras para cumplir el plan alimentario.</p>
+                        </div>
+                      </div>
+                    ) : null}
                     <FormField
                       label={
                         activeRole === "enfermeria"
                           ? "Plan de cuidados e indicaciones"
                           : activeRole === "psicologo"
                             ? "Plan terapéutico e indicaciones"
+                            : activeRole === "nutricion"
+                              ? "Plan nutricional e indicaciones"
                             : "Indicaciones al paciente"
                       }
                     >
@@ -2102,6 +2152,22 @@ export function EncounterWorkspace({
                         </button>
                       )}
                     </PDFDownloadLink>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() =>
+                        downloadEncounterSummaryWord({
+                          patient: selectedPatient,
+                          professional,
+                          encounter: activeEncounter,
+                          vitals: bundle?.vitals ?? null,
+                          medical: bundle?.medical ?? null,
+                          nursing: bundle?.nursing ?? null,
+                        })
+                      }
+                    >
+                      Descargar Word (.doc)
+                    </button>
                   </div>
                 </Card>
               ) : null}

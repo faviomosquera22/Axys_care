@@ -206,8 +206,10 @@ export async function getProfile(client: SupabaseClient, userId: string) {
 
 export async function upsertProfile(client: SupabaseClient, input: ProfessionalProfileInput & { id: string }) {
   const currentProfile = await getProfile(client, input.id);
+  const isPlaceholderProfession = (value?: string | null) =>
+    ["", "Profesional", "Pendiente"].includes((value ?? "").trim());
   const lockedProfession =
-    currentProfile?.profession?.trim() && currentProfile.role
+    currentProfile?.profession?.trim() && currentProfile.role && !isPlaceholderProfession(currentProfile.profession)
       ? {
           role: currentProfile.role,
           profession: currentProfile.profession,

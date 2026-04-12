@@ -85,8 +85,8 @@ button {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px 16px;
+  gap: 14px;
+  padding: 18px 12px;
   color: #eff8fb;
   background:
     linear-gradient(180deg, #0b1829 0%, #112240 100%);
@@ -97,19 +97,19 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 2px 4px 10px;
+  padding: 2px 6px 8px;
 }
 
 .shell-sidebar__logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #0fc4b4, #0891b2);
-  color: #fff;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.shell-sidebar__logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand strong {
@@ -127,6 +127,13 @@ button {
   margin-bottom: 0;
 }
 
+.shell-sidebar__wordmark {
+  width: auto;
+  max-width: 160px;
+  height: auto;
+  object-fit: contain;
+}
+
 .shell-sidebar__profile {
   display: flex;
   align-items: center;
@@ -138,7 +145,7 @@ button {
 
 .shell-sidebar__nav {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
   overflow-y: auto;
 }
@@ -475,25 +482,26 @@ button {
 }
 
 .prof-selector {
-  margin: 14px 16px;
+  margin: 10px 12px;
   padding: 3px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 3px;
   border-radius: 8px;
   background: #1a2f4a;
 }
 
 .prof-btn {
-  min-height: 34px;
-  padding: 7px 6px;
+  min-height: 28px;
+  padding: 5px 4px;
   border-radius: 6px;
   border: 0;
   background: transparent;
   color: #7a9ab5;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 700;
   cursor: default;
+  letter-spacing: -0.01em;
 }
 
 .prof-btn.active {
@@ -506,9 +514,9 @@ button {
 }
 
 .nav-section-title {
-  padding: 14px 10px 6px;
+  padding: 10px 8px 5px;
   color: #7a9ab5;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -517,14 +525,15 @@ button {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 1px;
-  padding: 9px 12px;
+  padding: 8px 10px;
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 0.83rem;
+  font-size: 0.75rem;
   font-weight: 500;
   transition: all 0.15s ease;
+  line-height: 1.2;
 }
 
 .nav-item:hover {
@@ -538,9 +547,10 @@ button {
 }
 
 .nav-item__icon {
-  width: 16px;
+  width: 12px;
   text-align: center;
   flex: 0 0 auto;
+  font-size: 0.78rem;
 }
 
 .nav-dot {
@@ -570,7 +580,7 @@ button {
 .shell-sidebar__footer {
   display: grid;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -728,6 +738,11 @@ button {
 .prof-psicologia {
   background: #ede9fe;
   color: #7c3aed;
+}
+
+.prof-nutricion {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .prof-mixto {
@@ -1188,6 +1203,16 @@ button {
 
 .auth-card {
   width: min(520px, 100%);
+}
+
+.auth-brand {
+  margin-bottom: 16px;
+}
+
+.auth-brand__logo {
+  width: min(220px, 100%);
+  height: auto;
+  object-fit: contain;
 }
 
 .auth-card h1 {
@@ -2305,15 +2330,154 @@ button {
 }
 
 .seal-card {
+  display: grid;
+  gap: 12px;
   padding: 14px;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
 }
 
+.seal-card__meta {
+  display: grid;
+  gap: 2px;
+}
+
+.seal-card__meta strong {
+  font-size: 0.98rem;
+}
+
+.seal-card__meta span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .seal-preview {
   max-height: 220px;
   object-fit: contain;
+}
+
+.seal-workbench {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.seal-tools {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(250, 248, 244, 0.9);
+}
+
+.seal-tool-group {
+  display: grid;
+  gap: 10px;
+}
+
+.seal-tool-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.seal-choice-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.seal-choice {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(34, 27, 22, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  color: inherit;
+  text-align: left;
+}
+
+.seal-choice strong {
+  font-size: 0.93rem;
+}
+
+.seal-choice span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.seal-choice.is-active,
+.seal-tone.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(25, 141, 141, 0.14);
+}
+
+.seal-tone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.seal-tone {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 27, 22, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  color: inherit;
+}
+
+.seal-tone__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.seal-tone[data-tone="teal"] .seal-tone__swatch {
+  background: #14808d;
+}
+
+.seal-tone[data-tone="navy"] .seal-tone__swatch {
+  background: #426ca0;
+}
+
+.seal-tone[data-tone="burgundy"] .seal-tone__swatch {
+  background: #9b536d;
+}
+
+.profile-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(248, 251, 252, 0.95);
+}
+
+.profile-form-actions__copy {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-form-actions__copy strong {
+  font-size: 0.96rem;
+}
+
+.profile-form-actions__copy span {
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .photo-grid {
@@ -2376,6 +2540,15 @@ button {
   .shell-user {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .seal-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-form-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .route-focus-strip,
@@ -2462,7 +2635,7 @@ button {
   }
 
   .prof-selector {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .patient-banner,
@@ -2527,6 +2700,10 @@ button {
   .patient-banner__identity strong,
   .page-hero__content h1 {
     font-size: 1.8rem;
+  }
+
+  .prof-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .status-chip,

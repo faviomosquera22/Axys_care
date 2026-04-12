@@ -6,7 +6,7 @@ import type {
   Profile,
   VitalSigns,
 } from "@axyscare/core-types";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 11, color: "#1f1a16" },
@@ -16,6 +16,28 @@ const styles = StyleSheet.create({
   section: { marginTop: 14 },
   sectionTitle: { fontSize: 12, marginBottom: 6, color: "#156669" },
   row: { marginBottom: 4 },
+  footer: {
+    marginTop: 22,
+    paddingTop: 16,
+    borderTop: "1 solid #d8ccc0",
+    gap: 10,
+  },
+  footerTitle: { fontSize: 12, color: "#156669", marginBottom: 4 },
+  footerText: { fontSize: 10, color: "#6a6056", marginBottom: 2 },
+  validationRow: { flexDirection: "row", gap: 16, marginTop: 8, alignItems: "flex-end" },
+  validationBlock: {
+    flex: 1,
+    minHeight: 96,
+    border: "1 solid #e2d8cc",
+    borderRadius: 12,
+    padding: 10,
+    justifyContent: "space-between",
+    backgroundColor: "#fbf8f4",
+  },
+  validationLabel: { fontSize: 9, color: "#6a6056", marginBottom: 6, textTransform: "uppercase" },
+  signatureImage: { width: "100%", height: 56, objectFit: "contain" },
+  sealImage: { width: "100%", height: 88, objectFit: "contain" },
+  validationName: { fontSize: 10, marginTop: 6, color: "#1f1a16" },
 });
 
 export function EncounterSummaryDocument({
@@ -93,8 +115,38 @@ export function EncounterSummaryDocument({
             </Text>
           </View>
         ) : null}
+
+        <View style={styles.footer}>
+          <Text style={styles.footerTitle}>Validación profesional</Text>
+          <Text style={styles.footerText}>
+            {professional ? `${professional.firstName} ${professional.lastName}` : "Perfil profesional pendiente"}
+          </Text>
+          <Text style={styles.footerText}>
+            {professional?.profession ?? "Profesional"} {professional?.specialty ? `· ${professional.specialty}` : ""}
+          </Text>
+          <Text style={styles.footerText}>
+            {professional?.professionalLicense ? `Registro ${professional.professionalLicense}` : "Registro pendiente"}
+            {professional?.city ? ` · ${professional.city}` : ""}
+          </Text>
+          {professional?.signatureUrl || professional?.sealUrl ? (
+            <View style={styles.validationRow}>
+              {professional?.signatureUrl ? (
+                <View style={styles.validationBlock}>
+                  <Text style={styles.validationLabel}>Firma</Text>
+                  <Image src={professional.signatureUrl} style={styles.signatureImage} />
+                  <Text style={styles.validationName}>{professional.firstName} {professional.lastName}</Text>
+                </View>
+              ) : null}
+              {professional?.sealUrl ? (
+                <View style={styles.validationBlock}>
+                  <Text style={styles.validationLabel}>Sello</Text>
+                  <Image src={professional.sealUrl} style={styles.sealImage} />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </Page>
     </Document>
   );
 }
-
