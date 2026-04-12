@@ -9,16 +9,21 @@ import {
 } from "@axyscare/core-db";
 import { Card, EmptyStatePanel, LoadingStateCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
 import { trackUIEvent } from "@/lib/client-analytics";
 import { useAuth, useUI } from "@/components/providers/providers";
+
+const ClientFullCalendar = dynamic(() => import("@fullcalendar/react"), {
+  ssr: false,
+  loading: () => <div className="calendar-loading">Cargando calendario...</div>,
+});
 
 function getAppointmentTone(status: Appointment["status"]) {
   if (status === "atendida") return "success" as const;
@@ -252,7 +257,7 @@ export default function AgendaPage() {
               tone="info"
             />
           </div>
-          <FullCalendar
+          <ClientFullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
             headerToolbar={{

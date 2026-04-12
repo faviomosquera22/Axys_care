@@ -111,7 +111,7 @@ export default function NewEncounterPage() {
       <Card className="workflow-banner workflow-banner--dense">
         <div className="workflow-banner__step">
           <strong>1. Confirmar contexto</strong>
-          <span>Paciente, tipo de encuentro y motivo principal.</span>
+          <span>Paciente, ruta clínica activa y motivo principal.</span>
         </div>
         <div className="workflow-banner__step">
           <strong>2. Registrar atención</strong>

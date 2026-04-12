@@ -282,22 +282,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="shell-layout">
       <aside className="shell-sidebar">
         <div className="shell-sidebar__brand">
-          <div className="shell-sidebar__logo">
-            <Image
-              src="/branding/axyscare-icon.png"
-              alt="AxysCare icono"
-              width={44}
-              height={44}
-              className="shell-sidebar__logo-image"
-              priority
-            />
-          </div>
-          <div className="brand brand--header">
+          <div className="brand brand--header shell-sidebar__brand-panel">
             <Image
               src="/branding/axyscare-logo.png"
               alt="AxysCare"
-              width={180}
-              height={44}
+              width={220}
+              height={60}
               className="shell-sidebar__wordmark"
               priority
             />

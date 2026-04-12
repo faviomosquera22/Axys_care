@@ -107,6 +107,20 @@ function inferPlanNoteKind(role: UserRole) {
   return "patient_indications" as const;
 }
 
+function inferEncounterTypeForRole(role: UserRole): EncounterKind {
+  if (role === "enfermeria") return "nursing";
+  if (role === "profesional_mixto" || role === "admin") return "mixed";
+  return "medical";
+}
+
+function formatEncounterTypeLabel(type: EncounterKind, role: UserRole) {
+  if (role === "nutricion" && type === "medical") return "Ruta nutricional";
+  if (role === "psicologo" && type === "medical") return "Ruta psicológica";
+  if (type === "nursing") return "Ruta de enfermería";
+  if (type === "mixed") return "Ruta mixta";
+  return "Ruta médica";
+}
+
 function TraceBlock({
   label,
   author,
@@ -241,7 +255,7 @@ export function EncounterWorkspace({
     defaultValues: {
       patientId: initialPatientId ?? "",
       appointmentId: null,
-      encounterType: "mixed" as const,
+      encounterType: inferEncounterTypeForRole(professional?.role ?? "medico"),
       chiefComplaint: "",
       startedAt: new Date().toISOString().slice(0, 16),
     },
@@ -458,12 +472,13 @@ export function EncounterWorkspace({
   const supportsNursing =
     selectedEncounterType === "nursing" || selectedEncounterType === "mixed";
   const activeRole = professional?.role ?? "medico";
+  const encounterTypeLabel = formatEncounterTypeLabel(selectedEncounterType, activeRole);
 
   useEffect(() => {
     if (activeEncounter) return;
-
-    if (activeRole === "nutricion" && encounterForm.getValues("encounterType") !== "medical") {
-      encounterForm.setValue("encounterType", "medical");
+    const inferredEncounterType = inferEncounterTypeForRole(activeRole);
+    if (encounterForm.getValues("encounterType") !== inferredEncounterType) {
+      encounterForm.setValue("encounterType", inferredEncounterType);
     }
   }, [activeEncounter, activeRole, encounterForm]);
 
@@ -535,6 +550,26 @@ export function EncounterWorkspace({
       )
       .slice(0, 10);
   }, [medicationDraft.medicationName]);
+  const filteredMedicationNames = useMemo(
+    () => Array.from(new Set(filteredMedicationCatalog.map((item) => item.name))),
+    [filteredMedicationCatalog],
+  );
+  const availableMedicationPresentations = useMemo(
+    () =>
+      medicationCatalog.filter(
+        (item) =>
+          normalizeSearch(item.name) ===
+          normalizeSearch(medicationDraft.medicationName),
+      ),
+    [medicationDraft.medicationName],
+  );
+  const selectedMedicationPresentation = useMemo(
+    () =>
+      availableMedicationPresentations.find(
+        (item) => item.presentation === medicationDraft.presentation,
+      ) ?? null,
+    [availableMedicationPresentations, medicationDraft.presentation],
+  );
   const encounterAuthor =
     activeEncounter?.createdByName ??
     (professional
@@ -753,19 +788,18 @@ export function EncounterWorkspace({
                 ))}
               </select>
             </FormField>
-            <FormField label="Tipo de encuentro">
-              <select {...encounterForm.register("encounterType")}>
-                <option value="medical">{activeRole === "nutricion" ? "Nutricional" : "Médico"}</option>
-                <option value="nursing">Enfermería</option>
-                <option value="mixed">Mixto</option>
-              </select>
-            </FormField>
             <FormField label="Inicio">
               <input
                 type="datetime-local"
                 {...encounterForm.register("startedAt")}
               />
             </FormField>
+          </div>
+          <div className="info-panel" style={{ marginTop: 0 }}>
+            <strong>Ruta clínica activa</strong>
+            <span>
+              {encounterTypeLabel}. Se determina automáticamente según el perfil profesional para evitar aperturas inconsistentes.
+            </span>
           </div>
           <FormField label="Motivo principal">
             <textarea {...encounterForm.register("chiefComplaint")} />
@@ -797,6 +831,7 @@ export function EncounterWorkspace({
             stageLabel={`${currentStageMeta.title} · ${completedBlocks}/${totalBlocks} bloques listos`}
             lastSavedAt={lastSavedAt}
             hasPendingChanges={hasPendingChanges}
+            sticky={false}
             actions={
               <div className="clinical-context-banner__inline-meta">
                 <span>{currentStageMeta.description}</span>
@@ -1789,6 +1824,7 @@ export function EncounterWorkspace({
                               setMedicationDraft((current) => ({
                                 ...current,
                                 medicationName: event.target.value,
+                                presentation: "",
                               }))
                             }
                             placeholder="Ej. para, ibu, amoxi, losa..."
@@ -1804,22 +1840,26 @@ export function EncounterWorkspace({
                           ))}
                         </datalist>
                         {medicationDraft.medicationName.trim() &&
-                        filteredMedicationCatalog.length ? (
+                        filteredMedicationNames.length ? (
                           <div className="stack">
-                            {filteredMedicationCatalog
+                            {filteredMedicationNames
                               .slice(0, 6)
-                              .map((item) => (
+                              .map((name) => {
+                                const presentationCount =
+                                  medicationCatalog.filter(
+                                    (item) => item.name === name,
+                                  ).length;
+                                return (
                                 <div
-                                  key={`${item.name}-${item.presentation}`}
+                                  key={name}
                                   className="trace-row"
                                 >
                                   <div>
-                                    <strong>{item.name}</strong>
+                                    <strong>{name}</strong>
                                     <p>
-                                      {item.presentation}
-                                      {item.commonDose
-                                        ? ` · ${item.commonDose}`
-                                        : ""}
+                                      {presentationCount === 1
+                                        ? "1 presentación disponible"
+                                        : `${presentationCount} presentaciones disponibles`}
                                     </p>
                                   </div>
                                   <button
@@ -1828,34 +1868,65 @@ export function EncounterWorkspace({
                                     onClick={() =>
                                       setMedicationDraft((current) => ({
                                         ...current,
-                                        medicationName: item.name,
-                                        presentation: item.presentation,
-                                        dosage:
-                                          current.dosage ||
-                                          item.commonDose ||
-                                          "",
+                                        medicationName: name,
+                                        presentation: "",
                                       }))
                                     }
                                   >
                                     Usar
                                   </button>
                                 </div>
-                              ))}
+                                );
+                              })}
                           </div>
                         ) : null}
                         <div className="form-grid">
-                          <FormField label="Presentación">
-                            <input
+                          <FormField
+                            label="Presentación"
+                            helper={
+                              availableMedicationPresentations.length
+                                ? "Elige la forma farmacéutica más adecuada para completar la orden."
+                                : "Selecciona primero un medicamento del catálogo."
+                            }
+                          >
+                            <select
                               value={medicationDraft.presentation}
-                              onChange={(event) =>
+                              disabled={!availableMedicationPresentations.length}
+                              onChange={(event) => {
+                                const selectedPresentation =
+                                  availableMedicationPresentations.find(
+                                    (item) =>
+                                      item.presentation === event.target.value,
+                                  );
                                 setMedicationDraft((current) => ({
                                   ...current,
                                   presentation: event.target.value,
-                                }))
-                              }
-                            />
+                                  dosage:
+                                    current.dosage ||
+                                    selectedPresentation?.commonDose ||
+                                    "",
+                                }));
+                              }}
+                            >
+                              <option value="">
+                                {availableMedicationPresentations.length
+                                  ? "Selecciona una presentación"
+                                  : "Sin presentaciones disponibles"}
+                              </option>
+                              {availableMedicationPresentations.map((item) => (
+                                <option
+                                  key={`${item.name}-${item.presentation}`}
+                                  value={item.presentation}
+                                >
+                                  {item.presentation}
+                                </option>
+                              ))}
+                            </select>
                           </FormField>
-                          <FormField label="Dosis">
+                          <FormField
+                            label="Dosis"
+                            helper={selectedMedicationPresentation?.commonDose}
+                          >
                             <input
                               value={medicationDraft.dosage}
                               onChange={(event) =>
@@ -2106,8 +2177,8 @@ export function EncounterWorkspace({
                       </strong>
                     </div>
                     <div className="summary-item">
-                      <span>Tipo de encuentro</span>
-                      <strong>{activeEncounter.encounterType}</strong>
+                      <span>Ruta clínica</span>
+                      <strong>{encounterTypeLabel}</strong>
                     </div>
                     <div className="summary-item">
                       <span>Diagnósticos</span>
@@ -2185,8 +2256,8 @@ export function EncounterWorkspace({
                 </span>
               </div>
               <div className="meta-strip">
-                <strong>Tipo</strong>
-                <span>{activeEncounter.encounterType}</span>
+                <strong>Ruta</strong>
+                <span>{encounterTypeLabel}</span>
               </div>
               <div className="meta-strip">
                 <strong>Apertura</strong>
