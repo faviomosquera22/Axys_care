@@ -12,7 +12,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
-import { PatientBanner } from "@/components/layout/patient-banner";
 import { useAuth } from "@/components/providers/providers";
 
 type HistoryFilter = "all" | "assessments" | "notes" | "orders" | "documents";
@@ -265,24 +264,7 @@ export default function HistoryPage() {
 
   return (
     <div className="stack">
-      {selectedPatient ? (
-        <PatientBanner
-          patient={selectedPatient}
-          actions={
-            <>
-              <Link href={`/nueva-atencion?patientId=${selectedPatient.id}`} className="btn">
-                Abrir atención
-              </Link>
-              <Link href={`/pacientes/${selectedPatient.id}`} className="btn secondary">
-                Ver ficha
-              </Link>
-              <button type="button" className="btn secondary" onClick={() => window.print()}>
-                Imprimir
-              </button>
-            </>
-          }
-        />
-      ) : (
+      {selectedPatient ? null : (
         <section className="page-hero">
           <div className="page-hero__content">
             <span className="page-hero__eyebrow">Historia clínica</span>

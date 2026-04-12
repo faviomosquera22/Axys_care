@@ -205,7 +205,22 @@ export async function getProfile(client: SupabaseClient, userId: string) {
 }
 
 export async function upsertProfile(client: SupabaseClient, input: ProfessionalProfileInput & { id: string }) {
-  const row = await unwrap(client.from("profiles").upsert(toProfileRow(input)).select().single());
+  const currentProfile = await getProfile(client, input.id);
+  const lockedProfession =
+    currentProfile?.profession?.trim() && currentProfile.role
+      ? {
+          role: currentProfile.role,
+          profession: currentProfile.profession,
+        }
+      : null;
+  const nextInput = lockedProfession
+    ? {
+        ...input,
+        role: lockedProfession.role,
+        profession: lockedProfession.profession,
+      }
+    : input;
+  const row = await unwrap(client.from("profiles").upsert(toProfileRow(nextInput)).select().single());
   return fromProfileRow(row);
 }
 

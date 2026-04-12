@@ -1,187 +1,210 @@
 "use client";
 
-import { getProfile, signOut } from "@axyscare/core-db";
+import { calculateAge } from "@axyscare/core-clinical";
+import { getPatient, getProfile, signOut } from "@axyscare/core-db";
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { GlobalSearch } from "@/components/layout/global-search";
-import { RouteFocusStrip } from "@/components/layout/route-focus-strip";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/providers";
 
-const navigationGroups = [
-  {
-    label: "Operación",
-    items: [
-      { href: "/dashboard", label: "Inicio" },
-      { href: "/agenda", label: "Agenda" },
-      { href: "/pacientes", label: "Pacientes" },
-      { href: "/nueva-atencion", label: "Nueva atención" },
-    ],
-  },
-  {
-    label: "Expediente",
-    items: [
-      { href: "/historia-clinica", label: "Historia clínica" },
-      { href: "/documentos", label: "Documentos" },
-      { href: "/procedimientos", label: "Procedimientos" },
-      { href: "/examenes", label: "Exámenes" },
-      { href: "/enfermeria", label: "Enfermería" },
-    ],
-  },
-  {
-    label: "Colaboración",
-    items: [
-      { href: "/compartidos-conmigo", label: "Compartidos conmigo" },
-      { href: "/compartidos-por-mi", label: "Compartidos por mí" },
-      { href: "/configuracion", label: "Configuración" },
-    ],
-  },
+type RoleKey = "admin" | "medico" | "psicologo" | "enfermeria" | "profesional_mixto";
+
+type NavEntry =
+  | { type: "title"; label: string }
+  | { type: "item"; href: string; label: string; icon: string; match?: string[]; badge?: string };
+
+type TopbarAction = {
+  href?: string;
+  label: string;
+  icon: string;
+  tone: "outline" | "navy" | "primary" | "icon";
+  action?: "print";
+};
+
+const professionOptions: { role: RoleKey; shortLabel: string }[] = [
+  { role: "medico", shortLabel: "Medico" },
+  { role: "enfermeria", shortLabel: "Enferm." },
+  { role: "psicologo", shortLabel: "Psico." },
+  { role: "profesional_mixto", shortLabel: "Mixto" },
 ];
+
+function getRolePreset(role?: string, profession?: string) {
+  const currentRole = (role as RoleKey | undefined) ?? "medico";
+
+  if (currentRole === "enfermeria") {
+    return {
+      role: currentRole,
+      topbarLabel: `🩺 ${profession || "Enfermería"}`,
+      topbarClassName: "prof-tag prof-enfermeria",
+      sidebarRoleLabel: `${profession || "Enfermería"} · AxysCare`,
+      nav: [
+        { type: "item", href: "/dashboard", icon: "🏠", label: "Inicio" },
+        { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
+        { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
+        { type: "title", label: "ENFERMERIA" },
+        { type: "item", href: "/enfermeria", icon: "📝", label: "Valoración" },
+        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica" },
+        { type: "item", href: "/nueva-atencion", icon: "📋", label: "Plan de cuidados" },
+        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+      ] satisfies NavEntry[],
+    };
+  }
+
+  if (currentRole === "psicologo") {
+    return {
+      role: currentRole,
+      topbarLabel: `🧠 ${profession || "Psicología"}`,
+      topbarClassName: "prof-tag prof-psicologia",
+      sidebarRoleLabel: `${profession || "Psicología"} · AxysCare`,
+      nav: [
+        { type: "item", href: "/dashboard", icon: "🏠", label: "Inicio" },
+        { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
+        { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
+        { type: "title", label: "PSICOLOGIA" },
+        { type: "item", href: "/historia-clinica", icon: "🧠", label: "Historia del problema" },
+        { type: "item", href: "/examenes", icon: "🔍", label: "Diagnóstico" },
+        { type: "item", href: "/nueva-atencion", icon: "🎯", label: "Plan terapéutico" },
+        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+      ] satisfies NavEntry[],
+    };
+  }
+
+  if (currentRole === "profesional_mixto" || currentRole === "admin") {
+    return {
+      role: currentRole,
+      topbarLabel: `⚕ ${profession || "Profesional mixto"}`,
+      topbarClassName: "prof-tag prof-mixto",
+      sidebarRoleLabel: `${profession || "Profesional mixto"} · AxysCare`,
+      nav: [
+        { type: "item", href: "/dashboard", icon: "🏠", label: "Inicio" },
+        { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
+        { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
+        { type: "title", label: "CLINICA" },
+        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
+        { type: "item", href: "/nueva-atencion", icon: "📝", label: "Atención" },
+        { type: "item", href: "/examenes", icon: "🔍", label: "Exámenes" },
+        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+      ] satisfies NavEntry[],
+    };
+  }
+
+  return {
+    role: "medico" as const,
+    topbarLabel: `⚕ ${profession || "Medicina General"}`,
+    topbarClassName: "prof-tag prof-medico",
+    sidebarRoleLabel: `${profession || "Medicina General"} · AxysCare`,
+    nav: [
+      { type: "item", href: "/dashboard", icon: "🏠", label: "Inicio" },
+      { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
+      { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
+      { type: "title", label: "MEDICO" },
+      { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
+      { type: "item", href: "/nueva-atencion", icon: "📝", label: "Motivo y anamnesis" },
+      { type: "item", href: "/examenes", icon: "🔍", label: "Diagnóstico" },
+      { type: "item", href: "/documentos", icon: "💊", label: "Plan y receta" },
+    ] satisfies NavEntry[],
+  };
+}
 
 function getPageMeta(pathname: string) {
   if (pathname.startsWith("/agenda")) {
     return {
       title: "Agenda clínica",
-      description: "Coordina citas, seguimiento y apertura de atención desde la misma estación.",
+      chip: "Jornada activa",
+      meta: ["📅 Citas y seguimientos", "⏱ Apertura rápida de atención", "🔄 Reagenda y continuidad"],
     };
   }
 
   if (pathname.startsWith("/pacientes/")) {
     return {
       title: "Ficha del paciente",
-      description: "Contexto activo del expediente y acceso directo a continuidad clínica.",
+      chip: "Ficha activa",
+      meta: ["📋 Expediente centralizado", "🧾 Contexto longitudinal", "📌 Siguiente paso clínico"],
     };
   }
 
   if (pathname.startsWith("/pacientes")) {
     return {
       title: "Base de pacientes",
-      description: "Busca, filtra y entra rápido a la ficha o a la atención.",
+      chip: "Directorio activo",
+      meta: ["👤 Búsqueda y filtros", "🤝 Compartición controlada", "🩺 Acceso a atención"],
     };
   }
 
   if (pathname.startsWith("/historia-clinica")) {
     return {
       title: "Historia clínica",
-      description: "Lectura longitudinal del encounter y del expediente clínico.",
+      chip: "Historia activa",
+      meta: ["📚 Lectura por encounter", "🧾 Timeline clínico", "📎 Órdenes y adjuntos"],
     };
   }
 
   if (pathname.startsWith("/nueva-atencion")) {
     return {
       title: "Nueva atención",
-      description: "Flujo guiado para documentar el encounter sin perder contexto.",
+      chip: "Edición en curso",
+      meta: ["🩺 Registro guiado", "💾 Trazabilidad clínica", "✅ Cierre por etapas"],
     };
   }
 
   if (pathname.startsWith("/configuracion")) {
     return {
       title: "Configuración",
-      description: "Perfil profesional, firma y sincronización operativa.",
+      chip: "Perfil profesional",
+      meta: ["✍️ Firma y sello", "⚕ Datos del profesional", "🔗 Integraciones"],
     };
   }
 
   return {
     title: "Centro clínico",
-    description: "Vista operativa para coordinar agenda, pacientes y continuidad clínica.",
+    chip: "Operación activa",
+    meta: ["📊 Vista operativa", "👥 Pacientes y agenda", "🩺 Continuidad clínica"],
   };
 }
 
-function getQuickActions(pathname: string) {
-  const patientMatch = pathname.match(/^\/pacientes\/([^/]+)/);
-  const patientId = patientMatch?.[1];
-
-  if (patientId) {
+function getTopbarActions(pathname: string, patientId?: string): TopbarAction[] {
+  if (pathname.startsWith("/historia-clinica") && patientId) {
     return [
-      { href: `/nueva-atencion?patientId=${patientId}`, label: "Retomar atención" },
-      { href: `/historia-clinica?patientId=${patientId}`, label: "Historia clínica" },
-      { href: `/pacientes/${patientId}`, label: "Resumen del paciente" },
-      { href: "/agenda", label: "Programar seguimiento" },
+      { href: "/documentos", icon: "📎", label: "Adjuntar", tone: "outline" },
+      { href: `/pacientes/${patientId}`, icon: "📄", label: "Resumen", tone: "navy" },
+      { href: `/nueva-atencion?patientId=${patientId}`, icon: "💾", label: "Continuar", tone: "primary" },
+      { icon: "🖨", label: "Imprimir", tone: "icon", action: "print" },
     ];
   }
 
-  if (pathname.startsWith("/agenda")) {
+  if (pathname.startsWith("/pacientes/") && patientId) {
     return [
-      { href: "/nueva-atencion", label: "Abrir atención" },
-      { href: "/pacientes", label: "Buscar paciente" },
-      { href: "/configuracion", label: "Google Calendar" },
-      { action: "print", label: "Imprimir agenda" },
-    ];
-  }
-
-  if (pathname.startsWith("/historia-clinica")) {
-    return [
-      { href: "/pacientes", label: "Buscar paciente" },
-      { href: "/nueva-atencion", label: "Continuar atención" },
-      { href: "/documentos", label: "Documentos clínicos" },
-      { action: "print", label: "Imprimir historia" },
+      { href: "/agenda", icon: "📅", label: "Agenda", tone: "outline" },
+      { href: `/historia-clinica?patientId=${patientId}`, icon: "📚", label: "Historia", tone: "outline" },
+      { href: `/pacientes/${patientId}`, icon: "📄", label: "Resumen", tone: "navy" },
+      { href: `/nueva-atencion?patientId=${patientId}`, icon: "🩺", label: "Atender", tone: "primary" },
     ];
   }
 
   if (pathname.startsWith("/configuracion")) {
     return [
-      { href: "/configuracion", label: "Perfil profesional" },
-      { href: "/configuracion", label: "Firma y sello" },
-      { href: "/configuracion", label: "Google Calendar" },
+      { href: "/configuracion", icon: "✍️", label: "Firma", tone: "outline" },
+      { href: "/configuracion", icon: "🔗", label: "Integrar", tone: "outline" },
+      { href: "/configuracion", icon: "📄", label: "Perfil", tone: "navy" },
+      { icon: "🖨", label: "Imprimir", tone: "icon", action: "print" },
     ];
   }
 
   return [
-    { href: "/nueva-atencion", label: "Nueva atención" },
-    { href: "/agenda", label: "Agenda de hoy" },
-    { href: "/pacientes", label: "Buscar paciente" },
-    { href: "/documentos", label: "Documentos clínicos" },
+    { href: "/pacientes", icon: "🔎", label: "Buscar", tone: "outline" },
+    { href: "/agenda", icon: "📅", label: "Agenda", tone: "outline" },
+    { href: "/documentos", icon: "📄", label: "Documentos", tone: "navy" },
+    { href: "/nueva-atencion", icon: "🩺", label: "Atención", tone: "primary" },
   ];
 }
 
-function QuickActionIcon({ label }: { label: string }) {
-  let icon: ReactNode = null;
-
-  if (label.includes("Paciente") || label.includes("Pacientes") || label.includes("Ficha")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.3 0-6 1.8-6 4v1h12v-1c0-2.2-2.7-4-6-4Z" />
-      </svg>
-    );
-  } else if (label.includes("Cita") || label.includes("Calendario")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 2h2v2h6V2h2v2h3v16H4V4h3V2Zm11 8H6v8h12v-8Z" />
-      </svg>
-    );
-  } else if (label.includes("atención") || label.includes("historia")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 4h12a2 2 0 0 1 2 2v12H7a2 2 0 0 0-2 2V4Zm2 3v2h8V7H7Zm0 4v2h8v-2H7Z" />
-      </svg>
-    );
-  } else if (label.includes("Documento")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 3h7l5 5v13H7V3Zm7 1.5V9h4.5L14 4.5ZM9 12v2h6v-2H9Zm0 4v2h6v-2H9Z" />
-      </svg>
-    );
-  } else if (label.includes("Imprimir")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 3h10v4H7V3Zm10 6a3 3 0 0 1 3 3v5h-3v4H7v-4H4v-5a3 3 0 0 1 3-3h10Zm-2 10v-4H9v4h6Z" />
-      </svg>
-    );
-  } else if (label.includes("Google")) {
-    icon = (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3a9 9 0 1 0 8.5 12H12v-3h8.8A9 9 0 0 0 12 3Z" />
-      </svg>
-    );
-  }
-
-  if (!icon) return null;
-  return <span className="quick-chip__icon">{icon}</span>;
+function isNavActive(pathname: string, entry: Extract<NavEntry, { type: "item" }>) {
+  return pathname === entry.href || pathname.startsWith(`${entry.href}/`) || entry.match?.some((item) => pathname.startsWith(item));
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { client, user } = useAuth();
   const profileQuery = useQuery({
@@ -189,18 +212,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => getProfile(client, user!.id),
     enabled: Boolean(user?.id),
   });
+  const patientIdFromPath = pathname.match(/^\/pacientes\/([^/]+)/)?.[1] ?? "";
+  const patientIdFromQuery = searchParams.get("patientId") ?? "";
+  const contextualPatientId = patientIdFromPath || patientIdFromQuery;
+  const patientQuery = useQuery({
+    queryKey: ["shell", "context-patient", contextualPatientId],
+    queryFn: () => getPatient(client, contextualPatientId),
+    enabled: Boolean(contextualPatientId),
+  });
+
   const profile = profileQuery.data;
+  const rolePreset = getRolePreset(profile?.role, profile?.profession);
+  const pageMeta = getPageMeta(pathname);
   const displayName =
     profile ? `${profile.firstName} ${profile.lastName}`.trim() : user?.email?.split("@")[0] ?? "Sin sesión";
-  const subtitle = profile?.profession ?? profile?.role ?? "Perfil profesional";
   const initials = displayName
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((value) => value[0]?.toUpperCase() ?? "")
     .join("");
-  const quickActions = getQuickActions(pathname);
-  const pageMeta = getPageMeta(pathname);
+  const patient = patientQuery.data;
+  const topbarTitle = patient ? `${patient.firstName} ${patient.lastName}`.trim() : pageMeta.title;
+  const topbarInitials = patient
+    ? `${patient.firstName?.[0] ?? ""}${patient.lastName?.[0] ?? ""}`.toUpperCase()
+    : (pageMeta.title
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((value) => value[0]?.toUpperCase() ?? "")
+        .join("") || "AX");
+  const topbarChip = patient
+    ? pathname.startsWith("/historia-clinica")
+      ? "Historia activa"
+      : "Ficha activa"
+    : pageMeta.chip;
+  const topbarMeta = patient
+    ? [
+        `📋 ${patient.documentType} ${patient.documentNumber}`,
+        `🎂 ${calculateAge(patient.birthDate)} años · ${patient.sex}`,
+        patient.bloodType ? `🩸 ${patient.bloodType}` : "",
+        patient.phone ? `📞 ${patient.phone}` : patient.email ? `✉️ ${patient.email}` : "",
+      ].filter(Boolean)
+    : pageMeta.meta;
+  const topbarActions = getTopbarActions(pathname, contextualPatientId || undefined);
 
   return (
     <div className="shell-layout">
@@ -208,82 +263,120 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="shell-sidebar__brand">
           <div className="shell-sidebar__logo">Ax</div>
           <div className="brand brand--header">
-            <strong>Axyscare</strong>
+            <strong>Axys<span>Care</span></strong>
             <span>Historia clínica digital</span>
           </div>
         </div>
 
-        <div className="shell-sidebar__profile">
-          <div className="shell-user__avatar">{initials || "AX"}</div>
-          <div className="shell-user__meta">
-            <strong>{displayName}</strong>
-            <span>{profile ? subtitle : user?.email ?? "Sin sesión"}</span>
-          </div>
+        <div className="prof-selector" aria-label="Profesión activa">
+          {professionOptions.map((option) => (
+            <button
+              key={option.role}
+              type="button"
+              className={`prof-btn ${rolePreset.role === option.role ? "active" : ""}`}
+              disabled
+            >
+              {option.shortLabel}
+            </button>
+          ))}
         </div>
 
         <nav className="shell-sidebar__nav">
-          {navigationGroups.map((group) => (
-            <div key={group.label} className="shell-nav-group">
-              <span className="shell-nav-group__label">{group.label}</span>
-              <div className="shell-nav-group__items">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`shell-sidebar__link ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}`}
-                  >
-                    <span className="shell-sidebar__dot" />
-                    {item.label}
-                  </Link>
-                ))}
+          {rolePreset.nav.map((entry) =>
+            entry.type === "title" ? (
+              <div key={entry.label} className="nav-section-title">
+                {entry.label}
               </div>
-            </div>
-          ))}
+            ) : (
+              <Link
+                key={`${entry.href}-${entry.label}`}
+                href={entry.href}
+                className={`nav-item ${isNavActive(pathname, entry) ? "active" : ""}`}
+              >
+                <span className="nav-item__icon" aria-hidden="true">
+                  {entry.icon}
+                </span>
+                <span className="nav-dot" />
+                <span>{entry.label}</span>
+                {"badge" in entry && entry.badge ? <span className="nav-badge">{entry.badge}</span> : null}
+              </Link>
+            ),
+          )}
         </nav>
 
         <div className="shell-sidebar__footer">
-          <Link href="/configuracion" className="quick-chip quick-chip--ghost">
-            {profile ? "Perfil profesional" : "Completar perfil"}
-          </Link>
-          <button
-            className="quick-chip quick-chip--danger"
-            onClick={async () => {
-              await signOut(client);
-              router.push("/login");
-            }}
-          >
-            Salir
-          </button>
+          <div className="prof-card">
+            <div className="prof-avatar">{initials || "AX"}</div>
+            <div>
+              <div className="prof-info-name">{displayName}</div>
+              <div className="prof-info-role">{rolePreset.sidebarRoleLabel}</div>
+            </div>
+          </div>
+
+          <div className="shell-sidebar__footer-actions">
+            <Link href="/configuracion" className="sidebar-footer-link">
+              ⚙️ Perfil
+            </Link>
+            <button
+              type="button"
+              className="sidebar-footer-link sidebar-footer-link--danger"
+              onClick={async () => {
+                await signOut(client);
+                router.push("/login");
+              }}
+            >
+              ⏻ Salir
+            </button>
+          </div>
         </div>
       </aside>
 
       <div className="shell-panel">
         <header className="shell-topbar">
-          <div className="shell-topbar__main">
+          <div className="patient-info">
+            <div className="patient-avatar">{topbarInitials || "AX"}</div>
             <div>
-              <span className="shell-topbar__eyebrow">AxysCare Web</span>
-              <h1>{pageMeta.title}</h1>
-              <p>{pageMeta.description}</p>
-            </div>
-            <div className="shell-topbar__actions">
-              {quickActions.map((action) =>
-                action.href ? (
-                  <Link key={`${action.label}-${action.href}`} href={action.href} className="quick-chip">
-                    <QuickActionIcon label={action.label} />
-                    {action.label}
-                  </Link>
-                ) : (
-                  <button key={action.label} type="button" className="quick-chip quick-chip--ghost" onClick={() => window.print()}>
-                    <QuickActionIcon label={action.label} />
-                    {action.label}
-                  </button>
-                ),
-              )}
+              <div className="shell-topbar__headline">
+                <span className="patient-name">{topbarTitle}</span>
+                <span className="meta-chip">{topbarChip}</span>
+                <span className={rolePreset.topbarClassName}>{rolePreset.topbarLabel}</span>
+              </div>
+              <div className="patient-meta">
+                {topbarMeta.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
             </div>
           </div>
-          <GlobalSearch />
+
+          <div className="topbar-actions">
+            {topbarActions.map((action) =>
+              action.href ? (
+                <Link
+                  key={`${action.label}-${action.href}`}
+                  href={action.href}
+                  className={`btn ${action.tone === "primary" ? "btn-primary" : action.tone === "navy" ? "btn-navy" : "btn-outline"}`}
+                >
+                  <span aria-hidden="true">{action.icon}</span>
+                  {action.tone !== "icon" ? <span>{action.label}</span> : null}
+                </Link>
+              ) : (
+                <button
+                  key={`${action.label}-${action.icon}`}
+                  type="button"
+                  className={action.tone === "icon" ? "btn-icon" : "btn btn-outline"}
+                  onClick={() => {
+                    if (action.action === "print") window.print();
+                  }}
+                >
+                  <span aria-hidden="true">{action.icon}</span>
+                  {action.tone !== "icon" ? <span>{action.label}</span> : null}
+                </button>
+              ),
+            )}
+          </div>
         </header>
-        <RouteFocusStrip />
+
         <main className="shell-main">{children}</main>
       </div>
     </div>

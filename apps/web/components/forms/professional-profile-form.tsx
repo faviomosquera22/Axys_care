@@ -121,8 +121,16 @@ export function ProfessionalProfileForm() {
   const watchedProfession = form.watch("profession");
   const watchedSpecialty = form.watch("specialty");
   const watchedLicense = form.watch("professionalLicense");
+  const persistedProfile = profileQuery.data as Profile | null | undefined;
+  const isProfessionLocked = Boolean(persistedProfile?.profession?.trim() && persistedProfile.role);
 
   useEffect(() => {
+    if (isProfessionLocked) return;
+
+    if (watchedRole === "medico" && form.getValues("profession") !== "Medicina General") {
+      form.setValue("profession", "Medicina General", { shouldDirty: true });
+    }
+
     if (watchedRole === "enfermeria") {
       if (form.getValues("profession") !== "Enfermería") {
         form.setValue("profession", "Enfermería", { shouldDirty: true });
@@ -142,7 +150,15 @@ export function ProfessionalProfileForm() {
         form.setValue("specialty", "Psicología clínica", { shouldDirty: true });
       }
     }
-  }, [form, watchedRole]);
+
+    if (watchedRole === "profesional_mixto" && form.getValues("profession") !== "Profesional mixto") {
+      form.setValue("profession", "Profesional mixto", { shouldDirty: true });
+    }
+
+    if (watchedRole === "admin" && form.getValues("profession") !== "Administración clínica") {
+      form.setValue("profession", "Administración clínica", { shouldDirty: true });
+    }
+  }, [form, isProfessionLocked, watchedRole]);
 
   const sealPreview = useMemo(
     () =>
@@ -171,7 +187,7 @@ export function ProfessionalProfileForm() {
             <input {...form.register("lastName")} />
           </FormField>
           <FormField label="Rol">
-            <select {...form.register("role")}>
+            <select {...form.register("role")} disabled={isProfessionLocked}>
               <option value="admin">admin</option>
               <option value="medico">medico</option>
               <option value="psicologo">psicologo</option>
@@ -182,7 +198,7 @@ export function ProfessionalProfileForm() {
           <FormField label="Profesión">
             <input
               {...form.register("profession")}
-              readOnly={watchedRole === "enfermeria" || watchedRole === "psicologo"}
+              readOnly
             />
           </FormField>
           <FormField label="Especialidad">
@@ -258,6 +274,14 @@ export function ProfessionalProfileForm() {
           <div className="info-panel">
             <strong>Perfil de psicología</strong>
             <span>La profesión se fija automáticamente como Psicología para activar el flujo clínico orientado a salud mental.</span>
+          </div>
+        ) : null}
+        {isProfessionLocked ? (
+          <div className="info-panel">
+            <strong>Profesión bloqueada</strong>
+            <span>
+              Este profesional ya fue dado de alta como {persistedProfile?.profession}. Para evitar inconsistencias clínicas, el rol y la profesión ya no se pueden cambiar.
+            </span>
           </div>
         ) : null}
         {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
