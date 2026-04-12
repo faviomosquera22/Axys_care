@@ -9,24 +9,84 @@ import { GlobalSearch } from "@/components/layout/global-search";
 import { RouteFocusStrip } from "@/components/layout/route-focus-strip";
 import { useAuth } from "@/components/providers/providers";
 
-const primaryItems = [
-  { href: "/dashboard", label: "Inicio" },
-  { href: "/agenda", label: "Agenda" },
-  { href: "/pacientes", label: "Pacientes" },
-  { href: "/historia-clinica", label: "Clínica" },
+const navigationGroups = [
+  {
+    label: "Operación",
+    items: [
+      { href: "/dashboard", label: "Inicio" },
+      { href: "/agenda", label: "Agenda" },
+      { href: "/pacientes", label: "Pacientes" },
+      { href: "/nueva-atencion", label: "Nueva atención" },
+    ],
+  },
+  {
+    label: "Expediente",
+    items: [
+      { href: "/historia-clinica", label: "Historia clínica" },
+      { href: "/documentos", label: "Documentos" },
+      { href: "/procedimientos", label: "Procedimientos" },
+      { href: "/examenes", label: "Exámenes" },
+      { href: "/enfermeria", label: "Enfermería" },
+    ],
+  },
+  {
+    label: "Colaboración",
+    items: [
+      { href: "/compartidos-conmigo", label: "Compartidos conmigo" },
+      { href: "/compartidos-por-mi", label: "Compartidos por mí" },
+      { href: "/configuracion", label: "Configuración" },
+    ],
+  },
 ];
 
-const workspaceItems = [
-  { href: "/nueva-atencion", label: "Nueva atención" },
-  { href: "/historia-clinica", label: "Historia clínica" },
-  { href: "/documentos", label: "Documentos" },
-  { href: "/procedimientos", label: "Procedimientos" },
-  { href: "/examenes", label: "Exámenes" },
-  { href: "/enfermeria", label: "Enfermería" },
-  { href: "/compartidos-conmigo", label: "Compartidos conmigo" },
-  { href: "/compartidos-por-mi", label: "Compartidos por mí" },
-  { href: "/configuracion", label: "Configuración" },
-];
+function getPageMeta(pathname: string) {
+  if (pathname.startsWith("/agenda")) {
+    return {
+      title: "Agenda clínica",
+      description: "Coordina citas, seguimiento y apertura de atención desde la misma estación.",
+    };
+  }
+
+  if (pathname.startsWith("/pacientes/")) {
+    return {
+      title: "Ficha del paciente",
+      description: "Contexto activo del expediente y acceso directo a continuidad clínica.",
+    };
+  }
+
+  if (pathname.startsWith("/pacientes")) {
+    return {
+      title: "Base de pacientes",
+      description: "Busca, filtra y entra rápido a la ficha o a la atención.",
+    };
+  }
+
+  if (pathname.startsWith("/historia-clinica")) {
+    return {
+      title: "Historia clínica",
+      description: "Lectura longitudinal del encounter y del expediente clínico.",
+    };
+  }
+
+  if (pathname.startsWith("/nueva-atencion")) {
+    return {
+      title: "Nueva atención",
+      description: "Flujo guiado para documentar el encounter sin perder contexto.",
+    };
+  }
+
+  if (pathname.startsWith("/configuracion")) {
+    return {
+      title: "Configuración",
+      description: "Perfil profesional, firma y sincronización operativa.",
+    };
+  }
+
+  return {
+    title: "Centro clínico",
+    description: "Vista operativa para coordinar agenda, pacientes y continuidad clínica.",
+  };
+}
 
 function getQuickActions(pathname: string) {
   const patientMatch = pathname.match(/^\/pacientes\/([^/]+)/);
@@ -140,84 +200,92 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     .map((value) => value[0]?.toUpperCase() ?? "")
     .join("");
   const quickActions = getQuickActions(pathname);
+  const pageMeta = getPageMeta(pathname);
 
   return (
-    <div className="app-shell">
-      <header className="shell-header">
-        <div className="shell-header__row">
+    <div className="shell-layout">
+      <aside className="shell-sidebar">
+        <div className="shell-sidebar__brand">
+          <div className="shell-sidebar__logo">Ax</div>
           <div className="brand brand--header">
             <strong>Axyscare</strong>
-            <span>Consulta clínica unificada</span>
+            <span>Historia clínica digital</span>
           </div>
-          <nav className="shell-nav">
-            {primaryItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`shell-nav__link ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+        </div>
+
+        <div className="shell-sidebar__profile">
+          <div className="shell-user__avatar">{initials || "AX"}</div>
+          <div className="shell-user__meta">
+            <strong>{displayName}</strong>
+            <span>{profile ? subtitle : user?.email ?? "Sin sesión"}</span>
+          </div>
+        </div>
+
+        <nav className="shell-sidebar__nav">
+          {navigationGroups.map((group) => (
+            <div key={group.label} className="shell-nav-group">
+              <span className="shell-nav-group__label">{group.label}</span>
+              <div className="shell-nav-group__items">
+                {group.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`shell-sidebar__link ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}`}
+                  >
+                    <span className="shell-sidebar__dot" />
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="shell-sidebar__footer">
+          <Link href="/configuracion" className="quick-chip quick-chip--ghost">
+            {profile ? "Perfil profesional" : "Completar perfil"}
+          </Link>
+          <button
+            className="quick-chip quick-chip--danger"
+            onClick={async () => {
+              await signOut(client);
+              router.push("/login");
+            }}
+          >
+            Salir
+          </button>
+        </div>
+      </aside>
+
+      <div className="shell-panel">
+        <header className="shell-topbar">
+          <div className="shell-topbar__main">
+            <div>
+              <span className="shell-topbar__eyebrow">AxysCare Web</span>
+              <h1>{pageMeta.title}</h1>
+              <p>{pageMeta.description}</p>
+            </div>
+            <div className="shell-topbar__actions">
+              {quickActions.map((action) =>
+                action.href ? (
+                  <Link key={`${action.label}-${action.href}`} href={action.href} className="quick-chip">
+                    <QuickActionIcon label={action.label} />
+                    {action.label}
+                  </Link>
+                ) : (
+                  <button key={action.label} type="button" className="quick-chip quick-chip--ghost" onClick={() => window.print()}>
+                    <QuickActionIcon label={action.label} />
+                    {action.label}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
           <GlobalSearch />
-          <div className="shell-user">
-            <div className="shell-user__avatar">{initials || "AX"}</div>
-            <div className="shell-user__meta">
-              <strong>{displayName}</strong>
-              <span>{user?.email ?? "Sin sesión"}</span>
-            </div>
-            <div className="shell-user__actions">
-              <Link href="/configuracion" className="quick-chip quick-chip--ghost">
-                {profile ? subtitle : "Completar perfil"}
-              </Link>
-              <button
-                className="quick-chip quick-chip--danger"
-                onClick={async () => {
-                  await signOut(client);
-                  router.push("/login");
-                }}
-              >
-                Salir
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="shell-toolbar">
-          <span className="shell-toolbar__label">Acciones rápidas</span>
-          <div className="shell-toolbar__actions">
-            {quickActions.map((action) =>
-              action.href ? (
-                <Link key={`${action.label}-${action.href}`} href={action.href} className="quick-chip">
-                  <QuickActionIcon label={action.label} />
-                  {action.label}
-                </Link>
-              ) : (
-                <button key={action.label} type="button" className="quick-chip quick-chip--ghost" onClick={() => window.print()}>
-                  <QuickActionIcon label={action.label} />
-                  {action.label}
-                </button>
-              ),
-            )}
-          </div>
-        </div>
-        <div className="shell-workspace">
-          <span className="shell-toolbar__label">Módulos clínicos</span>
-          <div className="shell-toolbar__actions">
-            {workspaceItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`quick-chip quick-chip--ghost ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+        </header>
         <RouteFocusStrip />
-      </header>
-      <main className="shell-main">{children}</main>
+        <main className="shell-main">{children}</main>
+      </div>
     </div>
   );
 }
