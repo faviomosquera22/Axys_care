@@ -33,7 +33,8 @@ export async function GET(request: Request) {
 
     const { error } = await supabase
       .from("professional_settings")
-      .update({
+      .upsert({
+        user_id: user.id,
         google_calendar_connected: true,
         google_calendar_email: profile.email ?? null,
         google_calendar_access_token: token.access_token,
@@ -41,8 +42,11 @@ export async function GET(request: Request) {
         google_calendar_scope: token.scope ?? null,
         google_calendar_token_expires_at: expiresAt,
         google_calendar_primary_calendar_id: "primary",
+      }, {
+        onConflict: "user_id",
       })
-      .eq("user_id", user.id);
+      .select("user_id")
+      .single();
 
     if (error) {
       throw new Error(error.message);

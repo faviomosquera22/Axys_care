@@ -13,7 +13,8 @@ export async function POST() {
 
   const { error } = await supabase
     .from("professional_settings")
-    .update({
+    .upsert({
+      user_id: user.id,
       google_calendar_connected: false,
       google_calendar_email: null,
       google_calendar_access_token: null,
@@ -21,8 +22,11 @@ export async function POST() {
       google_calendar_scope: null,
       google_calendar_token_expires_at: null,
       google_calendar_primary_calendar_id: null,
+    }, {
+      onConflict: "user_id",
     })
-    .eq("user_id", user.id);
+    .select("user_id")
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
