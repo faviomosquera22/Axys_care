@@ -132,7 +132,7 @@ export function buildSealDataUrl({
     specialty ? `${profession || "Profesión"} · ${specialty}` : profession || "Profesión",
   );
   const registration = escapeXml(professionalLicense || "PENDIENTE");
-  const cityLine = escapeXml(city?.trim() || "AxysCare");
+  const cityLine = escapeXml(city?.trim() || "Ciudad no registrada");
   const issuedAt = escapeXml(formatIssueDate());
   const metadata = buildMetadataComment(variant, accent);
 
@@ -154,8 +154,7 @@ export function buildSealDataUrl({
         <text x="260" y="300" text-anchor="middle" font-size="21" font-family="Arial, sans-serif" fill="${palette.muted}">Registro profesional ${registration}</text>
         <text x="260" y="334" text-anchor="middle" font-size="19" font-family="Arial, sans-serif" fill="${palette.muted}">${cityLine}</text>
         <path d="M130 370h260" stroke="${palette.frame}" stroke-width="2" stroke-linecap="round" opacity="0.2" />
-        <text x="260" y="404" text-anchor="middle" font-size="18" letter-spacing="3" font-family="Arial, sans-serif" fill="${palette.frame}">VALIDADO CLINICAMENTE</text>
-        <text x="260" y="434" text-anchor="middle" font-size="16" font-family="Arial, sans-serif" fill="${palette.muted}">Emitido ${issuedAt}</text>
+        <text x="260" y="404" text-anchor="middle" font-size="16" font-family="Arial, sans-serif" fill="${palette.muted}">Emitido ${issuedAt}</text>
       </svg>
     `;
     return encodeSvg(svg);
@@ -168,10 +167,10 @@ export function buildSealDataUrl({
         <rect x="10" y="10" width="740" height="220" rx="22" fill="${palette.soft}" stroke="${palette.frame}" stroke-width="3" />
         <rect x="34" y="34" width="104" height="104" rx="24" fill="${palette.accent}" opacity="0.12" />
         <text x="86" y="100" text-anchor="middle" font-size="42" font-family="Georgia, serif" fill="${palette.frame}">${initials}</text>
-        <text x="164" y="74" font-size="18" font-family="Arial, sans-serif" fill="${palette.accent}" letter-spacing="2">SELLO PROFESIONAL</text>
-        <text x="164" y="116" font-size="34" font-family="Georgia, serif" fill="${palette.ink}">${fullName}</text>
-        <text x="164" y="150" font-size="22" font-family="Arial, sans-serif" fill="${palette.muted}">${detailLine}</text>
-        <text x="164" y="182" font-size="20" font-family="Arial, sans-serif" fill="${palette.muted}">${cityLine} · Reg. ${registration}</text>
+        <text x="164" y="108" font-size="34" font-family="Georgia, serif" fill="${palette.ink}">${fullName}</text>
+        <text x="164" y="144" font-size="22" font-family="Arial, sans-serif" fill="${palette.muted}">${detailLine}</text>
+        <text x="164" y="176" font-size="20" font-family="Arial, sans-serif" fill="${palette.muted}">Reg. ${registration}</text>
+        <text x="164" y="204" font-size="18" font-family="Arial, sans-serif" fill="${palette.muted}">${cityLine}</text>
         <path d="M164 194h528" stroke="${palette.frame}" stroke-width="2" opacity="0.18" />
         <text x="692" y="214" text-anchor="end" font-size="16" font-family="Arial, sans-serif" fill="${palette.muted}">Emitido ${issuedAt}</text>
       </svg>
@@ -192,12 +191,10 @@ export function buildSealDataUrl({
       <rect x="34" y="34" width="752" height="212" rx="20" fill="none" stroke="${palette.accent}" stroke-width="2" stroke-dasharray="10 8" />
       <rect x="54" y="52" width="178" height="176" rx="26" fill="${palette.accent}" opacity="0.1" />
       <text x="143" y="122" text-anchor="middle" font-size="54" font-family="Georgia, serif" fill="${palette.frame}">${initials}</text>
-      <text x="143" y="156" text-anchor="middle" font-size="16" letter-spacing="3" font-family="Arial, sans-serif" fill="${palette.accent}">AXYSCARE</text>
-      <text x="264" y="84" font-size="18" font-family="Arial, sans-serif" fill="${palette.accent}" letter-spacing="2.5">ACREDITACION PROFESIONAL</text>
-      <text x="264" y="132" font-size="38" font-family="Georgia, serif" fill="${palette.ink}">${fullName}</text>
-      <text x="264" y="170" font-size="24" font-family="Arial, sans-serif" fill="${palette.frame}">${detailLine}</text>
-      <text x="264" y="206" font-size="21" font-family="Arial, sans-serif" fill="${palette.muted}">Registro: ${registration} · ${cityLine}</text>
-      <text x="264" y="234" font-size="18" font-family="Arial, sans-serif" fill="${palette.muted}">Documento emitido ${issuedAt}</text>
+      <text x="264" y="112" font-size="38" font-family="Georgia, serif" fill="${palette.ink}">${fullName}</text>
+      <text x="264" y="152" font-size="24" font-family="Arial, sans-serif" fill="${palette.frame}">${detailLine}</text>
+      <text x="264" y="190" font-size="21" font-family="Arial, sans-serif" fill="${palette.muted}">Registro: ${registration}</text>
+      <text x="264" y="220" font-size="18" font-family="Arial, sans-serif" fill="${palette.muted}">${cityLine} · Emitido ${issuedAt}</text>
     </svg>
   `;
 

@@ -30,8 +30,31 @@ const professionOptions: { role: RoleKey; shortLabel: string }[] = [
   { role: "profesional_mixto", shortLabel: "Mixto" },
 ];
 
-function getRolePreset(role?: string, profession?: string) {
+function withClinicalContext(
+  basePath: string,
+  options?: { patientId?: string; encounterId?: string; preserveEncounter?: boolean },
+) {
+  const params = new URLSearchParams();
+  if (options?.patientId) params.set("patientId", options.patientId);
+  if (options?.preserveEncounter && options?.encounterId) {
+    params.set("encounterId", options.encounterId);
+  }
+  const query = params.toString();
+  return query ? `${basePath}?${query}` : basePath;
+}
+
+function getPathnameFromHref(href: string) {
+  return href.split("?", 1)[0];
+}
+
+function getRolePreset(
+  role?: string,
+  profession?: string,
+  context?: { patientId?: string; encounterId?: string },
+) {
   const currentRole = (role as RoleKey | undefined) ?? "medico";
+  const patientId = context?.patientId;
+  const encounterId = context?.encounterId;
 
   if (currentRole === "enfermeria") {
     return {
@@ -44,10 +67,32 @@ function getRolePreset(role?: string, profession?: string) {
         { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
         { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
         { type: "title", label: "ENFERMERIA" },
-        { type: "item", href: "/enfermeria", icon: "📝", label: "Valoración" },
-        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica" },
-        { type: "item", href: "/nueva-atencion", icon: "📋", label: "Plan de cuidados" },
-        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+        {
+          type: "item",
+          href: withClinicalContext("/enfermeria", { patientId, encounterId, preserveEncounter: true }),
+          icon: "🩺",
+          label: "Valoración integral",
+        },
+        {
+          type: "item",
+          href: withClinicalContext("/historia-clinica", { patientId, encounterId, preserveEncounter: true }),
+          icon: "📚",
+          label: "Historia longitudinal",
+          badge: patientId ? "PAC" : undefined,
+        },
+        {
+          type: "item",
+          href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }),
+          icon: "📋",
+          label: "Plan de cuidados",
+          badge: encounterId ? "ACT" : undefined,
+        },
+        {
+          type: "item",
+          href: withClinicalContext("/documentos", { patientId, encounterId, preserveEncounter: true }),
+          icon: "📎",
+          label: "Documentos clínicos",
+        },
       ] satisfies NavEntry[],
     };
   }
@@ -63,10 +108,10 @@ function getRolePreset(role?: string, profession?: string) {
         { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
         { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
         { type: "title", label: "PSICOLOGIA" },
-        { type: "item", href: "/historia-clinica", icon: "🧠", label: "Historia del problema" },
+        { type: "item", href: withClinicalContext("/historia-clinica", { patientId }), icon: "🧠", label: "Historia del caso" },
         { type: "item", href: "/examenes", icon: "🔍", label: "Diagnóstico" },
-        { type: "item", href: "/nueva-atencion", icon: "🎯", label: "Plan terapéutico" },
-        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+        { type: "item", href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }), icon: "🎯", label: "Plan terapéutico" },
+        { type: "item", href: withClinicalContext("/documentos", { patientId }), icon: "📎", label: "Documentación clínica" },
       ] satisfies NavEntry[],
     };
   }
@@ -82,10 +127,10 @@ function getRolePreset(role?: string, profession?: string) {
         { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
         { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
         { type: "title", label: "NUTRICION" },
-        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
-        { type: "item", href: "/nueva-atencion", icon: "🥗", label: "Evaluación nutricional" },
+        { type: "item", href: withClinicalContext("/historia-clinica", { patientId }), icon: "📚", label: "Historia clínica", badge: "ACT" },
+        { type: "item", href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }), icon: "🥗", label: "Evaluación nutricional" },
         { type: "item", href: "/examenes", icon: "📏", label: "Indicadores y exámenes" },
-        { type: "item", href: "/documentos", icon: "📝", label: "Plan alimentario" },
+        { type: "item", href: withClinicalContext("/documentos", { patientId }), icon: "📝", label: "Plan alimentario" },
       ] satisfies NavEntry[],
     };
   }
@@ -101,10 +146,10 @@ function getRolePreset(role?: string, profession?: string) {
         { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
         { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
         { type: "title", label: "CLINICA" },
-        { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
-        { type: "item", href: "/nueva-atencion", icon: "📝", label: "Atención" },
+        { type: "item", href: withClinicalContext("/historia-clinica", { patientId }), icon: "📚", label: "Historia clínica", badge: "ACT" },
+        { type: "item", href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }), icon: "📝", label: "Atención activa" },
         { type: "item", href: "/examenes", icon: "🔍", label: "Exámenes" },
-        { type: "item", href: "/documentos", icon: "📎", label: "Documentos" },
+        { type: "item", href: withClinicalContext("/documentos", { patientId }), icon: "📎", label: "Documentación" },
       ] satisfies NavEntry[],
     };
   }
@@ -119,10 +164,10 @@ function getRolePreset(role?: string, profession?: string) {
       { type: "item", href: "/agenda", icon: "📅", label: "Agenda" },
       { type: "item", href: "/pacientes", icon: "👤", label: "Pacientes" },
       { type: "title", label: "MEDICO" },
-      { type: "item", href: "/historia-clinica", icon: "📚", label: "Historia clínica", badge: "ACT" },
-      { type: "item", href: "/nueva-atencion", icon: "📝", label: "Motivo y anamnesis" },
+      { type: "item", href: withClinicalContext("/historia-clinica", { patientId }), icon: "📚", label: "Historia clínica", badge: "ACT" },
+      { type: "item", href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }), icon: "📝", label: "Valoración y plan" },
       { type: "item", href: "/examenes", icon: "🔍", label: "Diagnóstico" },
-      { type: "item", href: "/documentos", icon: "💊", label: "Plan y receta" },
+      { type: "item", href: withClinicalContext("/documentos", { patientId }), icon: "💊", label: "Recetas y documentos" },
     ] satisfies NavEntry[],
   };
 }
@@ -183,12 +228,22 @@ function getPageMeta(pathname: string) {
   };
 }
 
-function getTopbarActions(pathname: string, patientId?: string): TopbarAction[] {
+function getTopbarActions(pathname: string, patientId?: string, encounterId?: string): TopbarAction[] {
   if (pathname.startsWith("/historia-clinica") && patientId) {
     return [
-      { href: "/documentos", icon: "📎", label: "Adjuntar", tone: "outline" },
+      {
+        href: withClinicalContext("/documentos", { patientId, encounterId, preserveEncounter: true }),
+        icon: "📎",
+        label: "Adjuntar",
+        tone: "outline",
+      },
       { href: `/pacientes/${patientId}`, icon: "📄", label: "Resumen", tone: "navy" },
-      { href: `/nueva-atencion?patientId=${patientId}`, icon: "💾", label: "Continuar", tone: "primary" },
+      {
+        href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }),
+        icon: "💾",
+        label: "Continuar",
+        tone: "primary",
+      },
       { icon: "🖨", label: "Imprimir", tone: "icon", action: "print" },
     ];
   }
@@ -196,9 +251,9 @@ function getTopbarActions(pathname: string, patientId?: string): TopbarAction[] 
   if (pathname.startsWith("/pacientes/") && patientId) {
     return [
       { href: "/agenda", icon: "📅", label: "Agenda", tone: "outline" },
-      { href: `/historia-clinica?patientId=${patientId}`, icon: "📚", label: "Historia", tone: "outline" },
+      { href: withClinicalContext("/historia-clinica", { patientId }), icon: "📚", label: "Historia", tone: "outline" },
       { href: `/pacientes/${patientId}`, icon: "📄", label: "Resumen", tone: "navy" },
-      { href: `/nueva-atencion?patientId=${patientId}`, icon: "🩺", label: "Atender", tone: "primary" },
+      { href: withClinicalContext("/nueva-atencion", { patientId }), icon: "🩺", label: "Atender", tone: "primary" },
     ];
   }
 
@@ -220,7 +275,8 @@ function getTopbarActions(pathname: string, patientId?: string): TopbarAction[] 
 }
 
 function isNavActive(pathname: string, entry: Extract<NavEntry, { type: "item" }>) {
-  return pathname === entry.href || pathname.startsWith(`${entry.href}/`) || entry.match?.some((item) => pathname.startsWith(item));
+  const entryPathname = getPathnameFromHref(entry.href);
+  return pathname === entryPathname || pathname.startsWith(`${entryPathname}/`) || entry.match?.some((item) => pathname.startsWith(item));
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -235,6 +291,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   });
   const patientIdFromPath = pathname.match(/^\/pacientes\/([^/]+)/)?.[1] ?? "";
   const patientIdFromQuery = searchParams.get("patientId") ?? "";
+  const encounterIdFromQuery = searchParams.get("encounterId") ?? "";
   const contextualPatientId = patientIdFromPath || patientIdFromQuery;
   const patientQuery = useQuery({
     queryKey: ["shell", "context-patient", contextualPatientId],
@@ -243,7 +300,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   });
 
   const profile = profileQuery.data;
-  const rolePreset = getRolePreset(profile?.role, profile?.profession);
+  const rolePreset = getRolePreset(profile?.role, profile?.profession, {
+    patientId: contextualPatientId || undefined,
+    encounterId: encounterIdFromQuery || undefined,
+  });
   const pageMeta = getPageMeta(pathname);
   const displayName =
     profile ? `${profile.firstName} ${profile.lastName}`.trim() : user?.email?.split("@")[0] ?? "Sin sesión";
@@ -276,7 +336,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         patient.phone ? `📞 ${patient.phone}` : patient.email ? `✉️ ${patient.email}` : "",
       ].filter(Boolean)
     : pageMeta.meta;
-  const topbarActions = getTopbarActions(pathname, contextualPatientId || undefined);
+  const topbarActions = getTopbarActions(pathname, contextualPatientId || undefined, encounterIdFromQuery || undefined);
 
   return (
     <div className="shell-layout">

@@ -5,7 +5,7 @@ import type { Profile } from "@axyscare/core-types";
 import { getProfile, upsertProfile } from "@axyscare/core-db";
 import { professionalProfileSchema, type ProfessionalProfileInput } from "@axyscare/core-validation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, SectionHeading } from "@axyscare/ui-shared";
@@ -39,6 +39,7 @@ function isPlaceholderProfession(value?: string | null) {
 
 export function ProfessionalProfileForm() {
   const { client, user } = useAuth();
+  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sealVariant, setSealVariant] = useState<SealVariant>("institutional");
@@ -97,9 +98,12 @@ export function ProfessionalProfileForm() {
 
   const mutation = useMutation({
     mutationFn: (values: ProfessionalProfileInput) => upsertProfile(client, { ...values, id: user!.id }),
-    onSuccess: () => {
+    onSuccess: (profile) => {
       setServerError(null);
       setSuccessMessage("Perfil profesional guardado correctamente.");
+      queryClient.setQueryData(["profile", user?.id], profile);
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile", "shell", user?.id] });
     },
     onError: (error) => {
       setSuccessMessage(null);
@@ -181,7 +185,11 @@ export function ProfessionalProfileForm() {
       }),
     [watchedFirstName, watchedLastName, watchedProfession, watchedSpecialty, watchedLicense, watchedCity, sealVariant, sealAccent],
   );
-  const usingCustomSeal = Boolean(watchedSealUrl && watchedSealUrl !== sealPreview);
+  const currentSealMetadata = parseSealMetadata(watchedSealUrl);
+  const usingCustomSeal = Boolean(watchedSealUrl) && !currentSealMetadata;
+  const resolvedSealPreview = usingCustomSeal
+    ? watchedSealUrl ?? sealPreview
+    : sealPreview;
 
   return (
     <Card>
@@ -194,7 +202,7 @@ export function ProfessionalProfileForm() {
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate({
             ...values,
-            sealUrl: values.sealUrl || sealPreview,
+            sealUrl: usingCustomSeal ? values.sealUrl : sealPreview,
           }),
         )}
       >
@@ -279,7 +287,7 @@ export function ProfessionalProfileForm() {
                 <strong>{usingCustomSeal ? "Sello personalizado activo" : "Sello automático activo"}</strong>
                 <span>{usingCustomSeal ? "Se respetará el PNG cargado." : "Se genera con los datos del perfil."}</span>
               </div>
-              <img src={watchedSealUrl || sealPreview} alt="Sello profesional" className="seal-preview" />
+              <img src={resolvedSealPreview} alt="Sello profesional" className="seal-preview" />
             </div>
             <div className="seal-tools">
               <div className="seal-tool-group">

@@ -121,6 +121,10 @@ function formatEncounterTypeLabel(type: EncounterKind, role: UserRole) {
   return "Ruta médica";
 }
 
+function shouldShowDiagnosisCode(source: ReturnType<typeof inferDiagnosisSource>) {
+  return source === "medical_icd10";
+}
+
 function TraceBlock({
   label,
   author,
@@ -1262,7 +1266,11 @@ export function EncounterWorkspace({
                         {diagnosisCatalog.map((item) => (
                           <option
                             key={item.code}
-                            value={`${item.code} · ${item.label}`}
+                            value={
+                              shouldShowDiagnosisCode(diagnosisSource)
+                                ? `${item.code} · ${item.label}`
+                                : item.label
+                            }
                           />
                         ))}
                       </datalist>
@@ -1281,7 +1289,9 @@ export function EncounterWorkspace({
                             <div key={entry.code} className="trace-row">
                               <div>
                                 <strong>
-                                  {entry.code} · {entry.label}
+                                  {shouldShowDiagnosisCode(diagnosisSource)
+                                    ? `${entry.code} · ${entry.label}`
+                                    : entry.label}
                                 </strong>
                                 <p>{entry.meta}</p>
                               </div>

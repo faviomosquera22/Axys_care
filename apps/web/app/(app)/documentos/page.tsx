@@ -10,12 +10,22 @@ import {
 } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/providers/providers";
 
 export default function DocumentsPage() {
   const { client } = useAuth();
+  const searchParams = useSearchParams();
+  const patientIdFromQuery = searchParams.get("patientId") ?? "";
+  const encounterIdFromQuery = searchParams.get("encounterId") ?? "";
   const [selectedPatientId, setSelectedPatientId] = useState("");
+
+  useEffect(() => {
+    if (patientIdFromQuery) {
+      setSelectedPatientId(patientIdFromQuery);
+    }
+  }, [patientIdFromQuery]);
 
   const patientsQuery = useQuery({
     queryKey: ["patients", "documents"],
@@ -29,23 +39,46 @@ export default function DocumentsPage() {
         selectedPatientId ? { patientId: selectedPatientId } : undefined,
       ),
   });
+  const attachments = attachmentsQuery.data ?? [];
+  const documentSummary = useMemo(() => {
+    const byCategory = attachments.reduce<Record<string, number>>((accumulator, attachment) => {
+      accumulator[attachment.category] = (accumulator[attachment.category] ?? 0) + 1;
+      return accumulator;
+    }, {});
+
+    return [
+      { label: "Archivos visibles", value: attachments.length },
+      { label: "Resultados", value: byCategory.resultado ?? 0 },
+      { label: "Imágenes", value: byCategory.imagen ?? 0 },
+      { label: "Documentos del episodio", value: attachments.filter((item) => item.encounterId === encounterIdFromQuery).length },
+    ];
+  }, [attachments, encounterIdFromQuery]);
 
   return (
     <div className="stack">
       <div className="topbar">
         <div>
-          <h1>Documentos clínicos</h1>
+          <h1>Centro documental clínico</h1>
           <p>
-            Resultados, PDFs e imágenes adjuntos al paciente o al encounter. Ya
-            no es un módulo aislado.
+            Consolida resultados, consentimientos, imágenes y soportes del
+            paciente o del episodio con trazabilidad clínica.
           </p>
         </div>
       </div>
 
+      <div className="summary-grid">
+        {documentSummary.map((item) => (
+          <Card key={item.label} className="summary-item">
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </Card>
+        ))}
+      </div>
+
       <Card>
         <SectionHeading
-          title="Filtro por paciente"
-          description="Los documentos viven dentro de la historia clínica; aquí solo se consolidan."
+          title="Filtro del expediente"
+          description="Los documentos viven dentro de la historia clínica; aquí se concentran para búsqueda, descarga y continuidad."
         />
         <div className="form-grid">
           <div className="form-field">
@@ -66,9 +99,31 @@ export default function DocumentsPage() {
         <div className="info-panel">
           <strong>Flujo recomendado</strong>
           <span>
-            Sube el PDF o la imagen dentro de Nueva atención o al revisar la
-            historia clínica. Aquí podrás localizarlo y descargarlo.
+            Sube el archivo dentro de Nueva atención o desde historia clínica.
+            Aquí podrás auditarlo, descargarlo y volver al episodio correcto.
           </span>
+        </div>
+        <div className="btn-row">
+          {selectedPatientId ? (
+            <Link
+              href={`/historia-clinica?patientId=${selectedPatientId}${encounterIdFromQuery ? `&encounterId=${encounterIdFromQuery}` : ""}`}
+              className="pill-link"
+            >
+              Abrir historia longitudinal
+            </Link>
+          ) : null}
+          {selectedPatientId ? (
+            <Link
+              href={`/nueva-atencion?patientId=${selectedPatientId}${encounterIdFromQuery ? `&encounterId=${encounterIdFromQuery}` : ""}`}
+              className="pill-link"
+            >
+              Adjuntar desde atención
+            </Link>
+          ) : (
+            <Link href="/nueva-atencion" className="pill-link">
+              Adjuntar desde atención
+            </Link>
+          )}
         </div>
       </Card>
 
@@ -90,7 +145,7 @@ export default function DocumentsPage() {
           />
         ) : (attachmentsQuery.data ?? []).length ? (
           <div className="stack">
-            {(attachmentsQuery.data ?? []).map((attachment) => (
+            {attachments.map((attachment) => (
               <div key={attachment.id} className="trace-row">
                 <strong>{attachment.fileName}</strong>
                 <span>
@@ -103,10 +158,18 @@ export default function DocumentsPage() {
                 <div className="btn-row">
                   {attachment.encounterId ? (
                     <Link
-                      href={`/historia-clinica?patientId=${attachment.patientId ?? ""}`}
+                      href={`/historia-clinica?patientId=${attachment.patientId ?? ""}&encounterId=${attachment.encounterId}`}
                       className="pill-link"
                     >
-                      Ver historia
+                      Ver episodio
+                    </Link>
+                  ) : null}
+                  {attachment.patientId ? (
+                    <Link
+                      href={`/pacientes/${attachment.patientId}`}
+                      className="pill-link"
+                    >
+                      Ver paciente
                     </Link>
                   ) : null}
                   {attachment.path.startsWith("data:") ? (

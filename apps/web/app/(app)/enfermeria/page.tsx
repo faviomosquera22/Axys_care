@@ -14,11 +14,15 @@ import {
 } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/providers";
 
 export default function NursingPage() {
   const { client } = useAuth();
+  const searchParams = useSearchParams();
+  const patientIdFromQuery = searchParams.get("patientId") ?? "";
+  const encounterIdFromQuery = searchParams.get("encounterId") ?? "";
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [selectedEncounterId, setSelectedEncounterId] = useState("");
 
@@ -43,6 +47,18 @@ export default function NursingPage() {
   );
 
   useEffect(() => {
+    if (patientIdFromQuery) {
+      setSelectedPatientId(patientIdFromQuery);
+    }
+  }, [patientIdFromQuery]);
+
+  useEffect(() => {
+    if (encounterIdFromQuery) {
+      setSelectedEncounterId(encounterIdFromQuery);
+    }
+  }, [encounterIdFromQuery]);
+
+  useEffect(() => {
     const nextEncounterId = nursingEncounters[0]?.id ?? "";
     setSelectedEncounterId((current) =>
       current && nursingEncounters.some((item) => item.id === current)
@@ -52,23 +68,38 @@ export default function NursingPage() {
   }, [nursingEncounters]);
 
   const bundle = bundleQuery.data;
+  const quickSummary = [
+    { label: "Pacientes visibles", value: patientsQuery.data?.length ?? 0 },
+    { label: "Encuentros nursing", value: nursingEncounters.length },
+    { label: "Diagnósticos PAE", value: bundle?.diagnoses.length ?? 0 },
+    { label: "Adjuntos clínicos", value: bundle?.attachments.length ?? 0 },
+  ];
 
   return (
     <div className="stack">
       <div className="topbar">
         <div>
-          <h1>Módulo de enfermería</h1>
+          <h1>Centro de valoración y continuidad</h1>
           <p>
-            Seguimiento de valoraciones y continuidad de cuidado sobre el mismo
-            encounter clínico.
+            Consola operativa para valorar, revisar evolución y sostener el
+            plan de cuidados dentro del mismo episodio clínico.
           </p>
         </div>
       </div>
 
+      <div className="summary-grid">
+        {quickSummary.map((item) => (
+          <Card key={item.label} className="summary-item">
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </Card>
+        ))}
+      </div>
+
       <Card>
         <SectionHeading
-          title="Selecciona el caso"
-          description="Filtra por paciente y abre la valoración de enfermería existente."
+          title="Selecciona el caso activo"
+          description="Filtra por paciente y continúa la valoración o el plan de cuidados del episodio correcto."
         />
         <div className="form-grid">
           <div className="form-field">
@@ -91,8 +122,8 @@ export default function NursingPage() {
       <div className="workspace-grid">
         <Card>
           <SectionHeading
-            title="Encuentros de enfermería"
-            description="Solo se muestran nursing o mixed."
+            title="Episodios con ruta de enfermería"
+            description="Se priorizan encounters nursing o mixed para continuar el mismo plan de cuidado."
           />
           {encountersQuery.isPending ? (
             <LoadingStateCard
@@ -131,17 +162,35 @@ export default function NursingPage() {
 
         <Card className="workspace-aside">
           <SectionHeading
-            title="Acción"
-            description="Trabaja sobre el mismo episodio clínico."
+            title="Acciones clínicas"
+            description="Usa el mismo contexto del episodio para evitar duplicidad."
           />
-          {selectedEncounterId ? (
-            <Link
-              href={`/nueva-atencion?encounterId=${selectedEncounterId}`}
-              className="btn"
-            >
-              Continuar valoración
-            </Link>
-          ) : null}
+          <div className="stack">
+            {selectedEncounterId ? (
+              <Link
+                href={`/nueva-atencion?encounterId=${selectedEncounterId}${selectedPatientId ? `&patientId=${selectedPatientId}` : ""}`}
+                className="btn"
+              >
+                Continuar valoración
+              </Link>
+            ) : null}
+            {selectedPatientId ? (
+              <Link
+                href={`/historia-clinica?patientId=${selectedPatientId}${selectedEncounterId ? `&encounterId=${selectedEncounterId}` : ""}`}
+                className="pill-link"
+              >
+                Abrir historia longitudinal
+              </Link>
+            ) : null}
+            {selectedPatientId ? (
+              <Link
+                href={`/documentos?patientId=${selectedPatientId}${selectedEncounterId ? `&encounterId=${selectedEncounterId}` : ""}`}
+                className="pill-link"
+              >
+                Revisar documentos clínicos
+              </Link>
+            ) : null}
+          </div>
         </Card>
       </div>
 
@@ -208,7 +257,7 @@ export default function NursingPage() {
           <Card>
             <SectionHeading
               title="Contexto clínico"
-              description="Signos vitales y notas relacionadas con la valoración."
+              description="Indicadores mínimos para decidir continuidad, riesgos y plan de cuidados."
             />
             <div className="summary-grid">
               <div className="summary-item">
@@ -227,6 +276,14 @@ export default function NursingPage() {
                 <span>Adjuntos</span>
                 <strong>{bundle.attachments.length}</strong>
               </div>
+            </div>
+            <div className="info-panel">
+              <strong>Uso recomendado</strong>
+              <span>
+                Desde esta vista conviene revisar riesgos, confirmar signos
+                vitales, abrir historia longitudinal y continuar el mismo plan
+                de cuidados sin abrir un episodio nuevo.
+              </span>
             </div>
           </Card>
         </div>

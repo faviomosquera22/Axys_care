@@ -156,7 +156,7 @@ export default function PatientsPage() {
         </div>
       </Card>
 
-      <div className="clinical-layout">
+      <div className="clinical-layout clinical-layout--patients">
       <div className="clinical-layout__main stack">
       <Card>
         <SectionHeading
@@ -227,7 +227,7 @@ export default function PatientsPage() {
                 <div className="patient-directory__actions">
                   <Link href={`/pacientes/${patient.id}`} className="action-pill action-pill--open" title="Abrir ficha">
                     <ActionIcon kind="open" />
-                    <span>Abrir ficha</span>
+                    <span>Ficha</span>
                   </Link>
                   <Link href={`/nueva-atencion?patientId=${patient.id}`} className="action-pill action-pill--care" title="Atender">
                     <ActionIcon kind="care" />

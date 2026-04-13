@@ -1566,6 +1566,10 @@ button {
   align-items: start;
 }
 
+.clinical-layout--patients {
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.62fr);
+}
+
 .clinical-layout__main,
 .clinical-layout__side {
   min-width: 0;
@@ -1686,9 +1690,9 @@ button {
 .patient-directory__row {
   display: grid;
   grid-template-columns:
-    minmax(220px, 1.3fr) 96px minmax(220px, 1.25fr) minmax(140px, 0.9fr)
-    110px minmax(220px, 1.1fr);
-  gap: 14px;
+    minmax(190px, 1.25fr) 84px minmax(180px, 1.05fr) minmax(120px, 0.82fr)
+    96px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
 }
 
@@ -1731,7 +1735,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-start;
 }
 
@@ -1739,12 +1743,14 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 30px;
+  min-width: 0;
+  padding: 6px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.88);
   color: var(--foreground);
+  white-space: nowrap;
 }
 
 .action-pill svg {
@@ -1755,7 +1761,7 @@ button {
 }
 
 .action-pill span {
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   font-weight: 600;
 }
 
@@ -2652,6 +2658,12 @@ button {
 
 @media (max-width: 1440px) {
   .clinical-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1620px) {
+  .clinical-layout--patients {
     grid-template-columns: 1fr;
   }
 }
