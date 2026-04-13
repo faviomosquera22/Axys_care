@@ -142,17 +142,6 @@ export default function AgendaPage() {
   const confirmedAppointments = todayAppointments.filter((appointment) => appointment.status === "confirmada").length;
   const virtualAppointments = todayAppointments.filter((appointment) => appointment.modality === "virtual").length;
 
-  if (appointmentsQuery.isLoading || patientsQuery.isLoading) {
-    return (
-      <div className="stack">
-        <LoadingStateCard
-          title="Cargando agenda clínica"
-          description="Estamos reuniendo citas y pacientes para que puedas coordinar el día sin fricción."
-        />
-      </div>
-    );
-  }
-
   const startEncounterMutation = useMutation({
     mutationFn: async (appointment: Appointment) => {
       const encounter = await createEncounterFromAppointment(
@@ -198,6 +187,17 @@ export default function AgendaPage() {
       notify({ tone: "info", message: `Cita marcada como ${updatedAppointment.status}.` });
     },
   });
+
+  if (appointmentsQuery.isLoading || patientsQuery.isLoading) {
+    return (
+      <div className="stack">
+        <LoadingStateCard
+          title="Cargando agenda clínica"
+          description="Estamos reuniendo citas y pacientes para que puedas coordinar el día sin fricción."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="stack">

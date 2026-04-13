@@ -76,7 +76,7 @@ button {
 
 .shell-layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 232px minmax(0, 1fr);
 }
 
 .shell-sidebar {
@@ -85,8 +85,8 @@ button {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px 12px;
+  gap: 10px;
+  padding: 14px 10px;
   color: #eff8fb;
   background:
     linear-gradient(180deg, #0b1829 0%, #112240 100%);
@@ -94,7 +94,7 @@ button {
 }
 
 .shell-sidebar__brand {
-  padding: 2px 6px 10px;
+  padding: 2px 4px 6px;
 }
 
 .brand strong {
@@ -114,9 +114,9 @@ button {
 
 .shell-sidebar__brand-panel {
   display: grid;
-  gap: 8px;
-  padding: 14px 14px 12px;
-  border-radius: 18px;
+  gap: 6px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 249, 252, 0.94));
   box-shadow: 0 14px 32px rgba(4, 16, 30, 0.18);
 }
@@ -124,10 +124,11 @@ button {
 .shell-sidebar__brand-panel span {
   color: #355266;
   opacity: 0.9;
+  font-size: 0.8rem;
 }
 
 .shell-sidebar__wordmark {
-  width: min(220px, 100%);
+  width: min(192px, 100%);
   max-width: 100%;
   height: auto;
   object-fit: contain;
@@ -481,23 +482,23 @@ button {
 }
 
 .prof-selector {
-  margin: 10px 12px;
-  padding: 3px;
+  margin: 6px 10px;
+  padding: 2px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  border-radius: 8px;
+  gap: 2px;
+  border-radius: 7px;
   background: #1a2f4a;
 }
 
 .prof-btn {
-  min-height: 28px;
-  padding: 5px 4px;
-  border-radius: 6px;
+  min-height: 24px;
+  padding: 3px 4px;
+  border-radius: 5px;
   border: 0;
   background: transparent;
   color: #7a9ab5;
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   cursor: default;
   letter-spacing: -0.01em;
@@ -513,9 +514,9 @@ button {
 }
 
 .nav-section-title {
-  padding: 8px 10px 2px;
+  padding: 6px 10px 1px;
   color: #7a9ab5;
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -525,15 +526,15 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 7px 10px 7px 12px;
-  border-radius: 10px;
+  min-height: 30px;
+  padding: 5px 9px 5px 10px;
+  border-radius: 8px;
   border: 1px solid transparent;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 0.75rem;
+  font-size: 0.71rem;
   font-weight: 500;
   transition: all 0.15s ease;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .nav-item:hover {
@@ -545,15 +546,15 @@ button {
 .nav-item.active {
   background: rgba(15, 196, 180, 0.06);
   border-color: rgba(15, 196, 180, 0.14);
-  box-shadow: inset 2px 0 0 #0fc4b4;
+  box-shadow: inset 1px 0 0 #0fc4b4;
   color: #0fc4b4;
 }
 
 .nav-item__icon {
-  width: 14px;
+  width: 12px;
   text-align: center;
   flex: 0 0 auto;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .nav-dot {
@@ -572,33 +573,33 @@ button {
 
 .nav-badge {
   margin-left: auto;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: 20px;
   background: #0fc4b4;
   color: #0b1829;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
 .shell-sidebar__footer {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 10px 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .prof-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: #1a2f4a;
 }
 
 .prof-avatar {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -607,37 +608,39 @@ button {
   background: linear-gradient(135deg, #0fc4b4, #3b82f6);
   color: #fff;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
 }
 
 .prof-info-name {
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .prof-info-role {
   color: #0fc4b4;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 500;
+  line-height: 1.15;
 }
 
 .shell-sidebar__footer-actions {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sidebar-footer-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1.5px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.88);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
