@@ -53,6 +53,10 @@ function getPathnameFromHref(href: string) {
   return href.split("?", 1)[0];
 }
 
+function appendQueryParam(href: string, key: string, value: string) {
+  return `${href}${href.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
+}
+
 function getRolePreset(
   role?: string,
   profession?: string,
@@ -94,12 +98,15 @@ function getRolePreset(
         },
         {
           type: "item",
-          href: withClinicalContext("/nueva-atencion", {
-            patientId,
-            encounterId,
-            preserveEncounter: true,
-            stage: encounterId ? "treatment" : "open",
-          }),
+          href: appendQueryParam(
+            withClinicalContext("/enfermeria", {
+              patientId,
+              encounterId,
+              preserveEncounter: true,
+            }),
+            "section",
+            "pae",
+          ),
           icon: "📋",
           label: "Plan PAE",
           badge: encounterId ? "ACT" : undefined,

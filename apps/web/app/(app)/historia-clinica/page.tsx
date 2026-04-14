@@ -3,6 +3,7 @@
 import {
   getEncounterBundle,
   getPatient,
+  listAppointments,
   listEncounters,
   listPatients,
 } from "@axyscare/core-db";
@@ -226,6 +227,10 @@ export default function HistoryPage() {
     queryKey: ["encounters", "history", selectedPatientId],
     queryFn: () => listEncounters(client, selectedPatientId || undefined),
   });
+  const appointmentsQuery = useQuery({
+    queryKey: ["appointments", "history"],
+    queryFn: () => listAppointments(client),
+  });
   const encounterBundleQuery = useQuery({
     queryKey: ["encounter-bundle", "history", selectedEncounterId],
     queryFn: () => getEncounterBundle(client, selectedEncounterId),
@@ -247,6 +252,13 @@ export default function HistoryPage() {
 
   const patients = patientsQuery.data ?? [];
   const encounters = encountersQuery.data ?? [];
+  const patientAppointments = useMemo(
+    () =>
+      (appointmentsQuery.data ?? []).filter(
+        (appointment) => appointment.patientId === selectedPatientId,
+      ),
+    [appointmentsQuery.data, selectedPatientId],
+  );
   const bundle = encounterBundleQuery.data;
   const selectedPatient = patientQuery.data;
   const selectedEncounter = useMemo(
@@ -268,6 +280,30 @@ export default function HistoryPage() {
     }),
     [timelineItems],
   );
+  const historySummary = useMemo(() => {
+    const lastAppointment = patientAppointments
+      .slice()
+      .sort(
+        (left, right) =>
+          new Date(right.startAt).getTime() - new Date(left.startAt).getTime(),
+      )[0];
+    const lastEncounter = encounters[0] ?? null;
+    const attendedAppointments = patientAppointments.filter(
+      (appointment) => appointment.status === "atendida",
+    ).length;
+    const missedAppointments = patientAppointments.filter(
+      (appointment) => appointment.status === "no_asistio",
+    ).length;
+
+    return {
+      totalAppointments: patientAppointments.length,
+      attendedAppointments,
+      missedAppointments,
+      openEncounters: encounters.filter((encounter) => encounter.status === "open").length,
+      lastAppointment,
+      lastEncounter,
+    };
+  }, [encounters, patientAppointments]);
   const filters = ["all", "assessments", "notes", "orders", "documents"] as HistoryFilter[];
 
   return (
@@ -372,7 +408,111 @@ export default function HistoryPage() {
               ? selectedEncounter.updatedAt ?? selectedEncounter.createdAt ?? selectedEncounter.startedAt
               : selectedPatient.updatedAt ?? selectedPatient.createdAt
           }
+          sticky={false}
         />
+      ) : null}
+
+      {selectedPatient ? (
+        <Card>
+          <SectionHeading
+            title="Resumen longitudinal del paciente"
+            description="Lectura rápida del historial de citas, continuidad y actividad clínica del paciente seleccionado."
+          />
+          <div className="summary-grid">
+            <div className="summary-item">
+              <span>Citas registradas</span>
+              <strong>{historySummary.totalAppointments}</strong>
+            </div>
+            <div className="summary-item">
+              <span>Citas atendidas</span>
+              <strong>{historySummary.attendedAppointments}</strong>
+            </div>
+            <div className="summary-item">
+              <span>No asistió</span>
+              <strong>{historySummary.missedAppointments}</strong>
+            </div>
+            <div className="summary-item">
+              <span>Encuentros abiertos</span>
+              <strong>{historySummary.openEncounters}</strong>
+            </div>
+          </div>
+          <div className="two-column">
+            <div className="ax-card">
+              <SectionHeading
+                title="Historial de citas"
+                description="Últimas citas registradas para este paciente."
+              />
+              {patientAppointments.length ? (
+                patientAppointments
+                  .slice()
+                  .sort(
+                    (left, right) =>
+                      new Date(right.startAt).getTime() -
+                      new Date(left.startAt).getTime(),
+                  )
+                  .slice(0, 5)
+                  .map((appointment) => (
+                    <div key={appointment.id} className="list-row">
+                      <div>
+                        <strong>{formatDateTime(appointment.startAt)}</strong>
+                        <p className="muted">{appointment.reason}</p>
+                      </div>
+                      <StatusBadge
+                        label={appointment.status}
+                        tone={
+                          appointment.status === "atendida"
+                            ? "success"
+                            : appointment.status === "confirmada"
+                              ? "info"
+                              : appointment.status === "no_asistio"
+                                ? "danger"
+                                : "warning"
+                        }
+                      />
+                    </div>
+                  ))
+              ) : (
+                <div className="empty-state">
+                  <strong>Sin citas registradas.</strong>
+                  <p>Cuando el paciente tenga agenda, aquí verás su secuencia de seguimiento.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="ax-card">
+              <SectionHeading
+                title="Última actividad clínica"
+                description="Puntos rápidos para entender continuidad antes de abrir o retomar atención."
+              />
+              <div className="stack">
+                <div className="trace-row">
+                  <strong>Última cita</strong>
+                  <span>
+                    {historySummary.lastAppointment
+                      ? `${formatDateTime(historySummary.lastAppointment.startAt)} · ${historySummary.lastAppointment.reason}`
+                      : "Sin citas registradas"}
+                  </span>
+                </div>
+                <div className="trace-row">
+                  <strong>Último encounter</strong>
+                  <span>
+                    {historySummary.lastEncounter
+                      ? `${formatDateTime(historySummary.lastEncounter.startedAt)} · ${historySummary.lastEncounter.chiefComplaint ?? "Sin motivo"}`
+                      : "Sin encuentros registrados"}
+                  </span>
+                </div>
+                <div className="trace-row">
+                  <strong>Continuidad clínica</strong>
+                  <span>
+                    {historySummary.openEncounters
+                      ? `${historySummary.openEncounters} encuentro(s) abiertos pendientes de cierre o seguimiento.`
+                      : "No hay encuentros abiertos. El historial está consolidado."}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
       ) : null}
 
       <div className="history-workspace">
