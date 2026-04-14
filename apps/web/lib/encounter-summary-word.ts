@@ -20,16 +20,6 @@ function renderRow(label: string, value?: string | null) {
   return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value?.trim() || "No registrado")}</p>`;
 }
 
-function renderImageBlock(label: string, src?: string | null, className = "") {
-  if (!src) return "";
-  return `
-    <div class="validation-card ${className}">
-      <div class="validation-label">${escapeHtml(label)}</div>
-      <img src="${src}" alt="${escapeHtml(label)}" />
-    </div>
-  `;
-}
-
 export function downloadEncounterSummaryWord({
   patient,
   professional,
@@ -50,10 +40,8 @@ export function downloadEncounterSummaryWord({
     : "Perfil profesional pendiente";
   const professionalRole = professional?.profession ?? "Profesional";
   const specialty = professional?.specialty ? ` · ${professional.specialty}` : "";
-  const registration = professional?.professionalLicense
-    ? `Registro ${professional.professionalLicense}`
-    : "Registro pendiente";
-  const city = professional?.city ? ` · ${professional.city}` : "";
+  const professionalId = professional?.professionalLicense || "Pendiente";
+  const issueDate = new Date().toLocaleDateString();
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -67,13 +55,12 @@ export function downloadEncounterSummaryWord({
           .header { border-bottom: 1px solid #c7b9a6; padding-bottom: 12px; margin-bottom: 18px; }
           .subtitle { color: #6a6056; font-size: 12px; }
           .section { margin-top: 16px; }
-          .footer { margin-top: 28px; border-top: 1px solid #d8ccc0; padding-top: 16px; }
-          .validation-grid { margin-top: 14px; width: 100%; }
-          .validation-card { display: inline-block; vertical-align: top; width: 47%; min-height: 120px; margin-right: 3%; border: 1px solid #e2d8cc; border-radius: 12px; padding: 12px; background: #fbf8f4; box-sizing: border-box; }
-          .validation-card:last-child { margin-right: 0; }
-          .validation-label { font-size: 11px; text-transform: uppercase; color: #6a6056; margin-bottom: 8px; }
-          .validation-card img { max-width: 100%; max-height: 120px; object-fit: contain; }
-          .signature-name { margin-top: 8px; font-size: 12px; }
+          .closing-page { page-break-before: always; padding-top: 420px; }
+          .closing-card { border-top: 1px solid #d8ccc0; padding-top: 18px; }
+          .closing-eyebrow { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #6a6056; margin-bottom: 10px; }
+          .closing-name { font-size: 22px; margin: 0 0 10px; }
+          .closing-line { margin: 0 0 6px; color: #4d463f; }
+          .closing-note { margin-top: 14px; font-size: 11px; color: #7a7168; }
         </style>
       </head>
       <body>
@@ -141,21 +128,16 @@ export function downloadEncounterSummaryWord({
             : ""
         }
 
-        <div class="footer">
-          <h2>Validación profesional</h2>
-          ${renderRow("Profesional", professionalName)}
-          ${renderRow("Perfil", `${professionalRole}${specialty}`)}
-          ${renderRow("Registro", `${registration}${city}`)}
-          ${
-            professional?.signatureUrl || professional?.sealUrl
-              ? `
-                <div class="validation-grid">
-                  ${renderImageBlock("Firma", professional?.signatureUrl)}
-                  ${renderImageBlock("Sello", professional?.sealUrl)}
-                </div>
-              `
-              : ""
-          }
+        <div class="closing-page">
+          <div class="closing-card">
+            <p class="closing-eyebrow">Cierre profesional</p>
+            <p class="closing-name">${escapeHtml(professionalName)}</p>
+            <p class="closing-line"><strong>Profesión:</strong> ${escapeHtml(`${professionalRole}${specialty}`)}</p>
+            <p class="closing-line"><strong>Cédula:</strong> ${escapeHtml(professionalId)}</p>
+            <p class="closing-line"><strong>Registro profesional:</strong> ${escapeHtml(professionalId)}</p>
+            <p class="closing-line"><strong>Fecha de emisión:</strong> ${escapeHtml(issueDate)}</p>
+            <p class="closing-note">Documento generado desde el expediente clínico con cierre automático del profesional responsable.</p>
+          </div>
         </div>
       </body>
     </html>

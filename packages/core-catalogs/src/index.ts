@@ -58,6 +58,21 @@ export type MedicationCatalogEntry = {
   commonDose?: string;
 };
 
+export const nursingBasicMedicationNames = [
+  "Paracetamol",
+  "Ibuprofeno",
+  "Diclofenaco",
+  "Naproxeno",
+  "Ketorolaco",
+  "Loratadina",
+  "Cetirizina",
+  "Omeprazol",
+  "Metoclopramida",
+  "Salbutamol",
+  "Acetilcisteína",
+  "Clorfenamina",
+] as const;
+
 export type NursingCareCatalogEntry = {
   id: string;
   label: string;

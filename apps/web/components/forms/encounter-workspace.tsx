@@ -6,6 +6,7 @@ import {
   icd10Catalog,
   internalNursingSuggestionCatalog,
   medicationCatalog,
+  nursingBasicMedicationNames,
   nutritionCatalog,
   psychologyCatalog,
 } from "@axyscare/core-catalogs";
@@ -36,6 +37,7 @@ import {
   medicalAssessmentSchema,
   medicationOrderSchema,
   nursingAssessmentSchema,
+  type AppointmentInput,
   vitalSignsSchema,
 } from "@axyscare/core-validation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,6 +47,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
+import { AppointmentForm } from "@/components/forms/appointment-form";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { EncounterSummaryDocument } from "@/components/pdf/encounter-summary-document";
 import { downloadEncounterSummaryWord } from "@/lib/encounter-summary-word";
@@ -123,6 +126,19 @@ function formatEncounterTypeLabel(type: EncounterKind, role: UserRole) {
 
 function shouldShowDiagnosisCode(source: ReturnType<typeof inferDiagnosisSource>) {
   return source === "medical_icd10";
+}
+
+function buildSuggestedFollowUpRange(startedAt: string) {
+  const baseDate = new Date(startedAt);
+  baseDate.setDate(baseDate.getDate() + 7);
+  baseDate.setSeconds(0, 0);
+  const endDate = new Date(baseDate);
+  endDate.setMinutes(endDate.getMinutes() + 30);
+
+  return {
+    startAt: baseDate.toISOString(),
+    endAt: endDate.toISOString(),
+  };
 }
 
 function TraceBlock({
@@ -488,7 +504,13 @@ export function EncounterWorkspace({
 
   const diagnosisSource = inferDiagnosisSource(activeRole);
   const canPrescribeMedication =
-    activeRole === "medico" || activeRole === "profesional_mixto";
+    activeRole === "medico" || activeRole === "profesional_mixto" || activeRole === "enfermeria";
+  const medicationCatalogForRole = useMemo(() => {
+    if (activeRole !== "enfermeria") return medicationCatalog;
+    return medicationCatalog.filter((item) =>
+      nursingBasicMedicationNames.includes(item.name as (typeof nursingBasicMedicationNames)[number]),
+    );
+  }, [activeRole]);
   const diagnosisCatalog = useMemo(() => {
     if (activeRole === "enfermeria") {
       return internalNursingSuggestionCatalog.map((item) => ({
@@ -544,7 +566,7 @@ export function EncounterWorkspace({
   }, [examDraft.category, examDraft.examName]);
   const filteredMedicationCatalog = useMemo(() => {
     const search = normalizeSearch(medicationDraft.medicationName);
-    return medicationCatalog
+    return medicationCatalogForRole
       .filter(
         (item) =>
           !search ||
@@ -553,19 +575,19 @@ export function EncounterWorkspace({
           ).includes(search),
       )
       .slice(0, 10);
-  }, [medicationDraft.medicationName]);
+  }, [medicationCatalogForRole, medicationDraft.medicationName]);
   const filteredMedicationNames = useMemo(
     () => Array.from(new Set(filteredMedicationCatalog.map((item) => item.name))),
     [filteredMedicationCatalog],
   );
   const availableMedicationPresentations = useMemo(
     () =>
-      medicationCatalog.filter(
+      medicationCatalogForRole.filter(
         (item) =>
           normalizeSearch(item.name) ===
           normalizeSearch(medicationDraft.medicationName),
       ),
-    [medicationDraft.medicationName],
+    [medicationCatalogForRole, medicationDraft.medicationName],
   );
   const selectedMedicationPresentation = useMemo(
     () =>
@@ -627,6 +649,30 @@ export function EncounterWorkspace({
     (procedureDraft.notes?.trim() ?? "") ||
     attachmentDraft.path ||
     procedurePhotoDraft.path,
+  );
+  const suggestedFollowUpRange = useMemo(
+    () => buildSuggestedFollowUpRange(activeEncounter?.startedAt ?? new Date().toISOString()),
+    [activeEncounter?.startedAt],
+  );
+  const followUpAppointmentDefaults = useMemo<Partial<AppointmentInput>>(
+    () => ({
+      patientId: selectedPatient?.id ?? "",
+      reason:
+        activeRole === "enfermeria"
+          ? "Seguimiento de valoración y plan de cuidados"
+          : activeRole === "psicologo"
+            ? "Seguimiento terapéutico"
+            : activeRole === "nutricion"
+              ? "Control de seguimiento nutricional"
+              : "Control y seguimiento clínico",
+      type: activeRole === "enfermeria" ? "valoracion_enfermeria" : "control",
+      modality: "presencial" as const,
+      status: "programada" as const,
+      notes: activeEncounter
+        ? `Cita de seguimiento sugerida al finalizar el encounter ${activeEncounter.id.slice(0, 8)}.`
+        : "",
+    }),
+    [activeEncounter, activeRole, selectedPatient?.id],
   );
   const guardEnabled = Boolean(activeEncounter && hasPendingChanges);
   const navigationGuardRef = useRef(guardEnabled);
@@ -1819,13 +1865,23 @@ export function EncounterWorkspace({
                     <SectionHeading
                       title="Tratamiento y medicación"
                       description={
-                        canPrescribeMedication
-                          ? "Prescripción estructurada con trazabilidad por profesional."
-                          : "Este rol no prescribe medicación. Usa esta etapa para educación y continuidad del cuidado."
+                        activeRole === "enfermeria"
+                          ? "Registro limitado a medicación básica de apoyo y continuidad del cuidado."
+                          : canPrescribeMedication
+                            ? "Prescripción estructurada con trazabilidad por profesional."
+                            : "Este rol no prescribe medicación. Usa esta etapa para educación y continuidad del cuidado."
                       }
                     />
                     {canPrescribeMedication ? (
                       <div className="stack">
+                        {activeRole === "enfermeria" ? (
+                          <div className="info-panel">
+                            <strong>Alcance de enfermería</strong>
+                            <span>
+                              Aquí solo se habilita medicación básica frecuente para manejo inicial o seguimiento, como analgésicos, antiinflamatorios y soporte respiratorio o gastrointestinal.
+                            </span>
+                          </div>
+                        ) : null}
                         <FormField label="Medicamento (busca por iniciales)">
                           <input
                             list="medication-catalog-options"
@@ -1843,7 +1899,7 @@ export function EncounterWorkspace({
                         <datalist id="medication-catalog-options">
                           {[
                             ...new Set(
-                              medicationCatalog.map((item) => item.name),
+                              medicationCatalogForRole.map((item) => item.name),
                             ),
                           ].map((name) => (
                             <option key={name} value={name} />
@@ -1856,7 +1912,7 @@ export function EncounterWorkspace({
                               .slice(0, 6)
                               .map((name) => {
                                 const presentationCount =
-                                  medicationCatalog.filter(
+                                  medicationCatalogForRole.filter(
                                     (item) => item.name === name,
                                   ).length;
                                 return (
@@ -2003,6 +2059,8 @@ export function EncounterWorkspace({
                               prescriberRole:
                                 activeRole === "medico"
                                   ? "medico"
+                                  : activeRole === "enfermeria"
+                                    ? "enfermeria"
                                   : "profesional_mixto",
                             });
                             if (!parsed.success) {
@@ -2174,83 +2232,109 @@ export function EncounterWorkspace({
               ) : null}
 
               {activeStage === "summary" ? (
-                <Card>
-                  <SectionHeading
-                    title="Resumen e impresión"
-                    description="Cierre del encuentro con trazabilidad y PDF clínico base."
-                  />
-                  <div className="summary-grid">
-                    <div className="summary-item">
-                      <span>Paciente</span>
-                      <strong>
-                        {selectedPatient.firstName} {selectedPatient.lastName}
-                      </strong>
+                <div className="two-column">
+                  <Card>
+                    <SectionHeading
+                      title="Resumen e impresión"
+                      description="Cierre del encuentro con trazabilidad y PDF clínico base."
+                    />
+                    <div className="summary-grid">
+                      <div className="summary-item">
+                        <span>Paciente</span>
+                        <strong>
+                          {selectedPatient.firstName} {selectedPatient.lastName}
+                        </strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Ruta clínica</span>
+                        <strong>{encounterTypeLabel}</strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Diagnósticos</span>
+                        <strong>{bundle?.diagnoses?.length ?? 0}</strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Notas clínicas</span>
+                        <strong>{bundle?.notes?.length ?? 0}</strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Exámenes</span>
+                        <strong>{bundle?.examOrders?.length ?? 0}</strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Adjuntos</span>
+                        <strong>{bundle?.attachments?.length ?? 0}</strong>
+                      </div>
+                      <div className="summary-item">
+                        <span>Medicaciones</span>
+                        <strong>{bundle?.medicationOrders?.length ?? 0}</strong>
+                      </div>
                     </div>
-                    <div className="summary-item">
-                      <span>Ruta clínica</span>
-                      <strong>{encounterTypeLabel}</strong>
+                    <div className="btn-row">
+                      <PDFDownloadLink
+                        document={
+                          <EncounterSummaryDocument
+                            patient={selectedPatient}
+                            professional={professional}
+                            encounter={activeEncounter}
+                            vitals={bundle?.vitals ?? null}
+                            medical={bundle?.medical ?? null}
+                            nursing={bundle?.nursing ?? null}
+                          />
+                        }
+                        fileName={`encounter-${activeEncounter.id}.pdf`}
+                      >
+                        {({ loading }) => (
+                          <button className="btn warn">
+                            {loading
+                              ? "Preparando PDF..."
+                              : "Descargar resumen clínico"}
+                          </button>
+                        )}
+                      </PDFDownloadLink>
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        onClick={() =>
+                          downloadEncounterSummaryWord({
+                            patient: selectedPatient,
+                            professional,
+                            encounter: activeEncounter,
+                            vitals: bundle?.vitals ?? null,
+                            medical: bundle?.medical ?? null,
+                            nursing: bundle?.nursing ?? null,
+                          })
+                        }
+                      >
+                        Descargar Word (.doc)
+                      </button>
                     </div>
-                    <div className="summary-item">
-                      <span>Diagnósticos</span>
-                      <strong>{bundle?.diagnoses?.length ?? 0}</strong>
+                  </Card>
+
+                  <Card>
+                    <SectionHeading
+                      title="Programar próxima cita"
+                      description="Al finalizar la atención, deja agendado el seguimiento del mismo paciente."
+                    />
+                    <div className="info-panel">
+                      <strong>Seguimiento sugerido</strong>
+                      <span>
+                        Se propone una cita en 7 días para el mismo paciente. Puedes ajustar fecha, modalidad, motivo o duración antes de guardarla.
+                      </span>
                     </div>
-                    <div className="summary-item">
-                      <span>Notas clínicas</span>
-                      <strong>{bundle?.notes?.length ?? 0}</strong>
-                    </div>
-                    <div className="summary-item">
-                      <span>Exámenes</span>
-                      <strong>{bundle?.examOrders?.length ?? 0}</strong>
-                    </div>
-                    <div className="summary-item">
-                      <span>Adjuntos</span>
-                      <strong>{bundle?.attachments?.length ?? 0}</strong>
-                    </div>
-                    <div className="summary-item">
-                      <span>Medicaciones</span>
-                      <strong>{bundle?.medicationOrders?.length ?? 0}</strong>
-                    </div>
-                  </div>
-                  <div className="btn-row">
-                    <PDFDownloadLink
-                      document={
-                        <EncounterSummaryDocument
-                          patient={selectedPatient}
-                          professional={professional}
-                          encounter={activeEncounter}
-                          vitals={bundle?.vitals ?? null}
-                          medical={bundle?.medical ?? null}
-                          nursing={bundle?.nursing ?? null}
-                        />
-                      }
-                      fileName={`encounter-${activeEncounter.id}.pdf`}
-                    >
-                      {({ loading }) => (
-                        <button className="btn warn">
-                          {loading
-                            ? "Preparando PDF..."
-                            : "Descargar resumen clínico"}
-                        </button>
-                      )}
-                    </PDFDownloadLink>
-                    <button
-                      type="button"
-                      className="btn secondary"
-                      onClick={() =>
-                        downloadEncounterSummaryWord({
-                          patient: selectedPatient,
-                          professional,
-                          encounter: activeEncounter,
-                          vitals: bundle?.vitals ?? null,
-                          medical: bundle?.medical ?? null,
-                          nursing: bundle?.nursing ?? null,
-                        })
-                      }
-                    >
-                      Descargar Word (.doc)
-                    </button>
-                  </div>
-                </Card>
+                    <AppointmentForm
+                      patients={patients}
+                      initialRange={suggestedFollowUpRange}
+                      initialValues={followUpAppointmentDefaults}
+                      onSaved={() => {
+                        setActionFeedback({
+                          tone: "success",
+                          message: "Próxima cita agendada correctamente desde el cierre de la atención.",
+                        });
+                      }}
+                    />
+                  </Card>
+                </div>
               ) : null}
             </div>
 

@@ -1789,6 +1789,12 @@ button {
   color: #3557a8;
 }
 
+.action-pill--delete {
+  border-color: rgba(176, 39, 39, 0.22);
+  background: rgba(176, 39, 39, 0.1);
+  color: #9e2b2b;
+}
+
 .patient-tabbar--hero {
   padding-top: 0;
 }

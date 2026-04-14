@@ -10,16 +10,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, SectionHeading } from "@axyscare/ui-shared";
 import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
-import { SignatureField } from "@/components/forms/signature-field";
-import {
-  buildSealDataUrl,
-  getDefaultSealVariant,
-  parseSealMetadata,
-  sealAccentOptions,
-  sealVariantOptions,
-  type SealAccent,
-  type SealVariant,
-} from "@/lib/professional-seal";
 import { useAuth } from "@/components/providers/providers";
 
 const genericProfessions = new Set(["", "Profesional", "Pendiente"]);
@@ -42,8 +32,6 @@ export function ProfessionalProfileForm() {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [sealVariant, setSealVariant] = useState<SealVariant>("institutional");
-  const [sealAccent, setSealAccent] = useState<SealAccent>("teal");
   const profileQuery = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: () => getProfile(client, user!.id),
@@ -74,9 +62,6 @@ export function ProfessionalProfileForm() {
   useEffect(() => {
     const profile = profileQuery.data as Profile | null | undefined;
     if (!profile) return;
-    const existingSealMetadata = parseSealMetadata(profile.sealUrl);
-    setSealVariant(existingSealMetadata?.variant ?? getDefaultSealVariant(profile.role));
-    setSealAccent(existingSealMetadata?.accent ?? "teal");
     form.reset({
       firstName: profile.firstName,
       lastName: profile.lastName,
@@ -118,7 +103,6 @@ export function ProfessionalProfileForm() {
   const watchedSpecialty = form.watch("specialty");
   const watchedLicense = form.watch("professionalLicense");
   const watchedCity = form.watch("city");
-  const watchedSealUrl = form.watch("sealUrl");
   const persistedProfile = profileQuery.data as Profile | null | undefined;
   const roleProfessionOptions = professionSuggestionsByRole[watchedRole] ?? [];
   const isProfessionLocked = Boolean(
@@ -171,25 +155,17 @@ export function ProfessionalProfileForm() {
     }
   }, [form, isProfessionLocked, watchedRole]);
 
-  const sealPreview = useMemo(
-    () =>
-      buildSealDataUrl({
-        firstName: watchedFirstName,
-        lastName: watchedLastName,
-        profession: watchedProfession,
-        specialty: watchedSpecialty,
-        professionalLicense: watchedLicense,
-        city: watchedCity,
-        variant: sealVariant,
-        accent: sealAccent,
-      }),
-    [watchedFirstName, watchedLastName, watchedProfession, watchedSpecialty, watchedLicense, watchedCity, sealVariant, sealAccent],
+  const professionalClosingPreview = useMemo(
+    () => [
+      `${watchedFirstName || "Nombre"} ${watchedLastName || "Apellido"}`.trim(),
+      [watchedProfession || "Profesión", watchedSpecialty || ""].filter(Boolean).join(" · "),
+      `Cédula: ${watchedLicense || "Pendiente"}`,
+      `Registro profesional: ${watchedLicense || "Pendiente"}`,
+      `Fecha de emisión: ${new Date().toLocaleDateString()}`,
+      watchedCity ? `Ciudad: ${watchedCity}` : "",
+    ].filter(Boolean),
+    [watchedFirstName, watchedLastName, watchedProfession, watchedSpecialty, watchedLicense, watchedCity],
   );
-  const currentSealMetadata = parseSealMetadata(watchedSealUrl);
-  const usingCustomSeal = Boolean(watchedSealUrl) && !currentSealMetadata;
-  const resolvedSealPreview = usingCustomSeal
-    ? watchedSealUrl ?? sealPreview
-    : sealPreview;
 
   return (
     <Card>
@@ -202,7 +178,8 @@ export function ProfessionalProfileForm() {
         onSubmit={form.handleSubmit((values) =>
           mutation.mutate({
             ...values,
-            sealUrl: usingCustomSeal ? values.sealUrl : sealPreview,
+            signatureUrl: "",
+            sealUrl: "",
           }),
         )}
       >
@@ -274,91 +251,19 @@ export function ProfessionalProfileForm() {
         <FormField label="Ciudad">
           <input {...form.register("city")} />
         </FormField>
-        <FormField label="Firma">
-          <SignatureField value={form.watch("signatureUrl")} onChange={(value) => form.setValue("signatureUrl", value ?? "")} />
-        </FormField>
         <FormField
-          label="Sello profesional"
-          helper="El sello activo se insertará automáticamente al pie del PDF y del Word descargable."
+          label="Cierre profesional"
+          helper="Este bloque se insertará automáticamente en la última hoja del PDF o Word descargado."
         >
-          <div className="seal-workbench">
-            <div className="seal-card">
-              <div className="seal-card__meta">
-                <strong>{usingCustomSeal ? "Sello personalizado activo" : "Sello automático activo"}</strong>
-                <span>{usingCustomSeal ? "Se respetará el PNG cargado." : "Se genera con los datos del perfil."}</span>
-              </div>
-              <img src={resolvedSealPreview} alt="Sello profesional" className="seal-preview" />
-            </div>
-            <div className="seal-tools">
-              <div className="seal-tool-group">
-                <span className="seal-tool-label">Estilo</span>
-                <div className="seal-choice-grid">
-                  {sealVariantOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`seal-choice ${sealVariant === option.value ? "is-active" : ""}`}
-                      onClick={() => setSealVariant(option.value)}
-                    >
-                      <strong>{option.label}</strong>
-                      <span>{option.description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="seal-tool-group">
-                <span className="seal-tool-label">Acento</span>
-                <div className="seal-tone-row">
-                  {sealAccentOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`seal-tone ${sealAccent === option.value ? "is-active" : ""}`}
-                      data-tone={option.value}
-                      onClick={() => setSealAccent(option.value)}
-                    >
-                      <span className="seal-tone__swatch" />
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="info-panel">
-                <strong>Aplicación automática</strong>
-                <span>La firma y el sello se adjuntan al cierre del documento exportado cuando estén cargados en el perfil.</span>
-              </div>
-              <div className="btn-row">
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={() => form.setValue("sealUrl", sealPreview, { shouldDirty: true })}
-                >
-                  Aplicar sello automático
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary"
-                  onClick={() => form.setValue("sealUrl", "", { shouldDirty: true })}
-                >
-                  Quitar personalizado
-                </button>
-                <label className="btn secondary">
-                  Subir sello PNG
-                  <input
-                    type="file"
-                    accept="image/png"
-                    style={{ display: "none" }}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => form.setValue("sealUrl", String(reader.result ?? ""), { shouldDirty: true });
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
+          <div className="info-panel">
+            <strong>Vista previa del cierre</strong>
+            <span>
+              {professionalClosingPreview.map((line) => (
+                <span key={line} style={{ display: "block" }}>
+                  {line}
+                </span>
+              ))}
+            </span>
           </div>
         </FormField>
         <FormField label="Biografía corta">

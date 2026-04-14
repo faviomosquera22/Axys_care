@@ -2,10 +2,10 @@
 
 import { calculateAge } from "@axyscare/core-clinical";
 import type { Patient } from "@axyscare/core-types";
-import { listPatients } from "@axyscare/core-db";
+import { deletePatient, listPatients } from "@axyscare/core-db";
 import { Card, LoadingStateCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PatientForm } from "@/components/forms/patient-form";
@@ -13,7 +13,7 @@ import { PatientSharePanel } from "@/components/forms/patient-share-panel";
 import { useAuth } from "@/components/providers/providers";
 import { useTableRealtime } from "@/components/realtime/use-table-realtime";
 
-function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
+function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" | "delete" }) {
   if (kind === "open") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -38,6 +38,14 @@ function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
     );
   }
 
+  if (kind === "delete") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 7h2v8h-2v-8Zm4 0h2v8h-2v-8ZM7 10h2v8H7v-8Z" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m4 16.5 9.8-9.8 3.5 3.5-9.8 9.8H4v-3.5Zm11.2-10.6 1.4-1.4a1.5 1.5 0 0 1 2.1 0l.8.8a1.5 1.5 0 0 1 0 2.1l-1.4 1.4-2.9-2.9Z" />
@@ -48,6 +56,7 @@ function ActionIcon({ kind }: { kind: "open" | "care" | "edit" | "share" }) {
 export default function PatientsPage() {
   const { client } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "owners" | "shared">("all");
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -73,6 +82,15 @@ export default function PatientsPage() {
   }, [patients, view]);
 
   useTableRealtime("patients-browser", ["patients", "patient_access"], [["patients", deferredSearch]]);
+
+  const deleteMutation = useMutation({
+    mutationFn: (patientId: string) => deletePatient(client, patientId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients-shared-with-me"] });
+      queryClient.invalidateQueries({ queryKey: ["patients-shared-by-me"] });
+    },
+  });
 
   if (patientsQuery.isLoading) {
     return (
@@ -246,18 +264,40 @@ export default function PatientsPage() {
                     <span>Editar</span>
                   </button>
                   {patient.relationshipToViewer === "owner" ? (
-                    <button
-                      type="button"
-                      className="action-pill action-pill--share"
-                      title="Compartir paciente"
-                      onClick={() => {
-                        setSharingPatient(patient);
-                        setEditingPatient(null);
-                      }}
-                    >
-                      <ActionIcon kind="share" />
-                      <span>Compartir</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="action-pill action-pill--share"
+                        title="Compartir paciente"
+                        onClick={() => {
+                          setSharingPatient(patient);
+                          setEditingPatient(null);
+                        }}
+                      >
+                        <ActionIcon kind="share" />
+                        <span>Compartir</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="action-pill action-pill--delete"
+                        title="Eliminar paciente"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `Eliminar a ${patient.firstName} ${patient.lastName} borrará citas, encounters y accesos compartidos asociados. Esta acción no se puede deshacer. ¿Continuar?`,
+                            )
+                          ) {
+                            return;
+                          }
+
+                          deleteMutation.mutate(patient.id);
+                        }}
+                      >
+                        <ActionIcon kind="delete" />
+                        <span>{deleteMutation.isPending ? "Eliminando" : "Eliminar"}</span>
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </div>

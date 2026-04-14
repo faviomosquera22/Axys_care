@@ -173,7 +173,7 @@ export const medicationOrderSchema = z.object({
   frequency: z.string().optional().nullable(),
   duration: z.string().optional().nullable(),
   instructions: z.string().optional().nullable(),
-  prescriberRole: z.enum(["medico", "profesional_mixto"]),
+  prescriberRole: z.enum(["medico", "profesional_mixto", "enfermeria"]),
 });
 
 export const printSchema = z.object({

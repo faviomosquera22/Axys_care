@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/providers";
+import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
 export default function NursingPage() {
   const { client } = useAuth();
@@ -39,6 +40,10 @@ export default function NursingPage() {
     queryFn: () => getEncounterBundle(client, selectedEncounterId),
     enabled: Boolean(selectedEncounterId),
   });
+  usePatientRealtime(selectedPatientId || undefined, [
+    ["encounters", "nursing", selectedPatientId],
+    ["encounter-bundle", "nursing", selectedEncounterId],
+  ]);
 
   const nursingEncounters = (encountersQuery.data ?? []).filter(
     (encounter) =>

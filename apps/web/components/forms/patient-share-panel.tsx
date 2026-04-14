@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Card, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
-import { FormField } from "@/components/forms/form-ui";
+import { FormField, FormStatusMessage } from "@/components/forms/form-ui";
 import { useAuth } from "@/components/providers/providers";
 import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
@@ -22,6 +22,8 @@ export function PatientSharePanel({
   const { client, user } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
   const isOwner = user?.id === ownerUserId;
 
@@ -72,6 +74,8 @@ export function PatientSharePanel({
         expiresAt: values.expiresAt || null,
       }),
     onSuccess: () => {
+      setServerError(null);
+      setSuccessMessage("Paciente compartido correctamente.");
       form.reset({
         patientId,
         sharedWithUserId: "",
@@ -82,16 +86,36 @@ export function PatientSharePanel({
       setSearch("");
       refresh();
     },
+    onError: (error) => {
+      setSuccessMessage(null);
+      setServerError(error instanceof Error ? error.message : "No se pudo compartir el paciente.");
+    },
   });
 
   const revokeMutation = useMutation({
     mutationFn: (accessId: string) => revokePatientAccess(client, accessId),
-    onSuccess: refresh,
+    onSuccess: () => {
+      setServerError(null);
+      setSuccessMessage("Acceso revocado correctamente.");
+      refresh();
+    },
+    onError: (error) => {
+      setSuccessMessage(null);
+      setServerError(error instanceof Error ? error.message : "No se pudo revocar el acceso.");
+    },
   });
 
   const removeMutation = useMutation({
     mutationFn: (accessId: string) => removeSharedPatientFromMyList(client, accessId),
-    onSuccess: refresh,
+    onSuccess: () => {
+      setServerError(null);
+      setSuccessMessage("Paciente quitado de tu lista compartida.");
+      refresh();
+    },
+    onError: (error) => {
+      setSuccessMessage(null);
+      setServerError(error instanceof Error ? error.message : "No se pudo quitar el paciente compartido.");
+    },
   });
 
   const myAccess = (accessQuery.data ?? []).find((item) => item.sharedWithUserId === user?.id);
@@ -159,6 +183,11 @@ export function PatientSharePanel({
               {shareMutation.error instanceof Error ? shareMutation.error.message : "No se pudo compartir."}
             </div>
           ) : null}
+          {shareMutation.isPending ? (
+            <FormStatusMessage tone="loading" message="Compartiendo paciente..." />
+          ) : null}
+          {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
+          {serverError ? <div className="form-error">{serverError}</div> : null}
 
           <button className="btn" disabled={shareMutation.isPending || !form.watch("sharedWithUserId")}>
             {shareMutation.isPending ? "Compartiendo..." : "Compartir paciente"}
@@ -179,6 +208,8 @@ export function PatientSharePanel({
           >
             {removeMutation.isPending ? "Quitando..." : "Quitar de mi lista"}
           </button>
+          {successMessage ? <FormStatusMessage tone="success" message={successMessage} /> : null}
+          {serverError ? <div className="form-error">{serverError}</div> : null}
         </div>
       ) : null}
 

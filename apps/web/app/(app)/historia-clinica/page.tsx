@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ClinicalContextBanner } from "@/components/layout/clinical-context-banner";
 import { useAuth } from "@/components/providers/providers";
+import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
 type HistoryFilter = "all" | "assessments" | "notes" | "orders" | "documents";
 type EncounterBundle = Awaited<ReturnType<typeof getEncounterBundle>>;
@@ -230,6 +231,12 @@ export default function HistoryPage() {
     queryFn: () => getEncounterBundle(client, selectedEncounterId),
     enabled: Boolean(selectedEncounterId),
   });
+
+  usePatientRealtime(selectedPatientId || undefined, [
+    ["patient", "history", selectedPatientId],
+    ["encounters", "history", selectedPatientId],
+    ["encounter-bundle", "history", selectedEncounterId],
+  ]);
 
   useEffect(() => {
     const nextEncounterId = encountersQuery.data?.[0]?.id ?? "";

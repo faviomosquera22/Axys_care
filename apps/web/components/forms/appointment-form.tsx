@@ -41,11 +41,13 @@ export function AppointmentForm({
   patients,
   initialAppointment,
   initialRange,
+  initialValues,
   onSaved,
 }: {
   patients: Patient[];
   initialAppointment?: Appointment | null;
   initialRange?: { startAt: string; endAt: string } | null;
+  initialValues?: Partial<AppointmentInput>;
   onSaved?: (appointment: Appointment) => void;
 }) {
   const { client, user } = useAuth();
@@ -56,16 +58,16 @@ export function AppointmentForm({
   const form = useForm<AppointmentInput>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      patientId: "",
+      patientId: initialValues?.patientId ?? "",
       professionalId: user?.id,
       startAt: initialRange?.startAt ?? "",
       endAt: initialRange?.endAt ?? "",
-      reason: "",
-      type: "presencial",
-      modality: "presencial",
-      status: "programada",
-      notes: "",
-      meetLink: "",
+      reason: initialValues?.reason ?? "",
+      type: initialValues?.type ?? "presencial",
+      modality: initialValues?.modality ?? "presencial",
+      status: initialValues?.status ?? "programada",
+      notes: initialValues?.notes ?? "",
+      meetLink: initialValues?.meetLink ?? "",
     },
   });
   const settingsQuery = useQuery({
@@ -95,6 +97,31 @@ export function AppointmentForm({
     form.setValue("startAt", initialRange.startAt.slice(0, 16));
     form.setValue("endAt", initialRange.endAt.slice(0, 16));
   }, [form, initialAppointment, initialRange]);
+
+  useEffect(() => {
+    if (initialAppointment || !initialValues) return;
+    if (initialValues.patientId) {
+      form.setValue("patientId", initialValues.patientId);
+    }
+    if (initialValues.reason) {
+      form.setValue("reason", initialValues.reason);
+    }
+    if (initialValues.type) {
+      form.setValue("type", initialValues.type);
+    }
+    if (initialValues.modality) {
+      form.setValue("modality", initialValues.modality);
+    }
+    if (initialValues.status) {
+      form.setValue("status", initialValues.status);
+    }
+    if (initialValues.notes) {
+      form.setValue("notes", initialValues.notes);
+    }
+    if (initialValues.meetLink) {
+      form.setValue("meetLink", initialValues.meetLink);
+    }
+  }, [form, initialAppointment, initialValues]);
 
   const mutation = useMutation({
     mutationFn: (values: AppointmentInput) =>

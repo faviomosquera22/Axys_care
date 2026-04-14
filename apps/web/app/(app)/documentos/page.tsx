@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/providers/providers";
+import { usePatientRealtime } from "@/components/realtime/use-patient-realtime";
 
 export default function DocumentsPage() {
   const { client } = useAuth();
@@ -39,6 +40,9 @@ export default function DocumentsPage() {
         selectedPatientId ? { patientId: selectedPatientId } : undefined,
       ),
   });
+  usePatientRealtime(selectedPatientId || undefined, [
+    ["attachments", "documents", selectedPatientId],
+  ]);
   const attachments = attachmentsQuery.data ?? [];
   const documentSummary = useMemo(() => {
     const byCategory = attachments.reduce<Record<string, number>>((accumulator, attachment) => {
