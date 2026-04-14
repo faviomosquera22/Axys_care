@@ -13,6 +13,16 @@ export default function NewEncounterPage() {
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId") ?? undefined;
   const encounterId = searchParams.get("encounterId") ?? undefined;
+  const stageParam = searchParams.get("stage");
+  const initialStage =
+    stageParam === "open" ||
+    stageParam === "vitals" ||
+    stageParam === "assessment" ||
+    stageParam === "records" ||
+    stageParam === "treatment" ||
+    stageParam === "summary"
+      ? stageParam
+      : undefined;
   const { client, user } = useAuth();
   const patientsQuery = useQuery({
     queryKey: ["patients", "encounter"],
@@ -139,6 +149,7 @@ export default function NewEncounterPage() {
         professional={profileQuery.data ?? null}
         initialPatientId={patientId}
         initialEncounterId={encounterId}
+        initialStage={initialStage}
       />
     </div>
   );

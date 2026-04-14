@@ -4,7 +4,7 @@ import { calculateAge } from "@axyscare/core-clinical";
 import type { Patient } from "@axyscare/core-types";
 import { deletePatient, listPatients } from "@axyscare/core-db";
 import { Card, LoadingStateCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
-import { startTransition, useDeferredValue, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -61,6 +61,7 @@ export default function PatientsPage() {
   const [view, setView] = useState<"all" | "owners" | "shared">("all");
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [sharingPatient, setSharingPatient] = useState<Patient | null>(null);
+  const sidePanelRef = useRef<HTMLDivElement | null>(null);
   const deferredSearch = useDeferredValue(search);
   const patientsQuery = useQuery({
     queryKey: ["patients", deferredSearch],
@@ -80,6 +81,14 @@ export default function PatientsPage() {
 
     return patients;
   }, [patients, view]);
+
+  useEffect(() => {
+    if (!sharingPatient && !editingPatient) {
+      return;
+    }
+
+    sidePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [editingPatient, sharingPatient]);
 
   useTableRealtime("patients-browser", ["patients", "patient_access"], [["patients", deferredSearch]]);
 
@@ -315,45 +324,7 @@ export default function PatientsPage() {
       </Card>
       </div>
       <aside className="clinical-layout__side stack">
-      <Card>
-        <SectionHeading
-          title={editingPatient ? "Editar paciente" : "Nuevo paciente"}
-          description={
-            editingPatient
-              ? "Actualiza los datos del paciente sin salir del listado."
-              : "Registro clínico básico con datos demográficos y antecedentes."
-          }
-        />
-        <PatientForm
-          initialPatient={editingPatient}
-          onSaved={(patient) => {
-            if (editingPatient) {
-              setEditingPatient(null);
-              return;
-            }
-            startTransition(() => router.push(`/pacientes/${patient.id}`));
-          }}
-        />
-        {editingPatient ? (
-          <div className="btn-row" style={{ marginTop: 12 }}>
-            <button type="button" className="btn secondary" onClick={() => setEditingPatient(null)}>
-              Cancelar edición
-            </button>
-            <Link href={`/pacientes/${editingPatient.id}`} className="pill-link">
-              Abrir ficha
-            </Link>
-          </div>
-        ) : null}
-        <div className="info-panel">
-          <strong>Qué sigue después</strong>
-          <span>
-            {editingPatient
-              ? "Guarda los cambios y el listado reflejará los datos actualizados del paciente."
-              : "La ficha del paciente te llevará a historia clínica, colaboración y apertura ordenada de una nueva atención."}
-          </span>
-        </div>
-      </Card>
-
+      <div ref={sidePanelRef} className="stack">
       {sharingPatient ? (
         <Card>
           <SectionHeading
@@ -370,7 +341,47 @@ export default function PatientsPage() {
             </Link>
           </div>
         </Card>
-      ) : null}
+      ) : (
+        <Card>
+          <SectionHeading
+            title={editingPatient ? "Editar paciente" : "Nuevo paciente"}
+            description={
+              editingPatient
+                ? "Actualiza los datos del paciente sin salir del listado."
+                : "Registro clínico básico con datos demográficos y antecedentes."
+            }
+          />
+          <PatientForm
+            initialPatient={editingPatient}
+            onSaved={(patient) => {
+              if (editingPatient) {
+                setEditingPatient(null);
+                return;
+              }
+              startTransition(() => router.push(`/pacientes/${patient.id}`));
+            }}
+          />
+          {editingPatient ? (
+            <div className="btn-row" style={{ marginTop: 12 }}>
+              <button type="button" className="btn secondary" onClick={() => setEditingPatient(null)}>
+                Cancelar edición
+              </button>
+              <Link href={`/pacientes/${editingPatient.id}`} className="pill-link">
+                Abrir ficha
+              </Link>
+            </div>
+          ) : null}
+          <div className="info-panel">
+            <strong>Qué sigue después</strong>
+            <span>
+              {editingPatient
+                ? "Guarda los cambios y el listado reflejará los datos actualizados del paciente."
+                : "La ficha del paciente te llevará a historia clínica, colaboración y apertura ordenada de una nueva atención."}
+            </span>
+          </div>
+        </Card>
+      )}
+      </div>
       </aside>
       </div>
     </div>

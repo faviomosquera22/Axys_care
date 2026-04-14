@@ -57,7 +57,6 @@ export function downloadEncounterSummaryWord({
           .section { margin-top: 16px; }
           .closing-page { page-break-before: always; padding-top: 420px; }
           .closing-card { border-top: 1px solid #d8ccc0; padding-top: 18px; }
-          .closing-eyebrow { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #6a6056; margin-bottom: 10px; }
           .closing-name { font-size: 22px; margin: 0 0 10px; }
           .closing-line { margin: 0 0 6px; color: #4d463f; }
           .closing-note { margin-top: 14px; font-size: 11px; color: #7a7168; }
@@ -130,7 +129,6 @@ export function downloadEncounterSummaryWord({
 
         <div class="closing-page">
           <div class="closing-card">
-            <p class="closing-eyebrow">Cierre profesional</p>
             <p class="closing-name">${escapeHtml(professionalName)}</p>
             <p class="closing-line"><strong>Profesión:</strong> ${escapeHtml(`${professionalRole}${specialty}`)}</p>
             <p class="closing-line"><strong>Cédula:</strong> ${escapeHtml(professionalId)}</p>

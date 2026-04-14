@@ -32,13 +32,19 @@ const professionOptions: { role: RoleKey; shortLabel: string }[] = [
 
 function withClinicalContext(
   basePath: string,
-  options?: { patientId?: string; encounterId?: string; preserveEncounter?: boolean },
+  options?: {
+    patientId?: string;
+    encounterId?: string;
+    preserveEncounter?: boolean;
+    stage?: "open" | "vitals" | "assessment" | "records" | "treatment" | "summary";
+  },
 ) {
   const params = new URLSearchParams();
   if (options?.patientId) params.set("patientId", options.patientId);
   if (options?.preserveEncounter && options?.encounterId) {
     params.set("encounterId", options.encounterId);
   }
+  if (options?.stage) params.set("stage", options.stage);
   const query = params.toString();
   return query ? `${basePath}?${query}` : basePath;
 }
@@ -69,29 +75,40 @@ function getRolePreset(
         { type: "title", label: "ENFERMERIA" },
         {
           type: "item",
-          href: withClinicalContext("/enfermeria", { patientId, encounterId, preserveEncounter: true }),
+          href: withClinicalContext("/nueva-atencion", {
+            patientId,
+            encounterId,
+            preserveEncounter: true,
+            stage: encounterId ? "assessment" : "vitals",
+          }),
           icon: "🩺",
-          label: "Valoración integral",
+          label: "Valorar ahora",
+          badge: encounterId ? "ACT" : undefined,
         },
         {
           type: "item",
           href: withClinicalContext("/historia-clinica", { patientId, encounterId, preserveEncounter: true }),
           icon: "📚",
-          label: "Historia longitudinal",
+          label: "Evolución del caso",
           badge: patientId ? "PAC" : undefined,
         },
         {
           type: "item",
-          href: withClinicalContext("/nueva-atencion", { patientId, encounterId, preserveEncounter: true }),
+          href: withClinicalContext("/nueva-atencion", {
+            patientId,
+            encounterId,
+            preserveEncounter: true,
+            stage: encounterId ? "treatment" : "open",
+          }),
           icon: "📋",
-          label: "Plan de cuidados",
+          label: "Plan PAE",
           badge: encounterId ? "ACT" : undefined,
         },
         {
           type: "item",
           href: withClinicalContext("/documentos", { patientId, encounterId, preserveEncounter: true }),
           icon: "📎",
-          label: "Documentos clínicos",
+          label: "Adjuntos del caso",
         },
       ] satisfies NavEntry[],
     };

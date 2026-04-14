@@ -141,6 +141,132 @@ function buildSuggestedFollowUpRange(startedAt: string) {
   };
 }
 
+const medicationRouteOptions = [
+  "Oral",
+  "Sublingual",
+  "Tópica",
+  "Inhalatoria",
+  "Nasal",
+  "Oftálmica",
+  "Ótica",
+  "Rectal",
+  "Vaginal",
+  "Intramuscular",
+  "Intravenosa",
+  "Subcutánea",
+] as const;
+
+const medicationFrequencyOptions = [
+  "Cada 4 horas",
+  "Cada 6 horas",
+  "Cada 8 horas",
+  "Cada 12 horas",
+  "Cada 24 horas",
+  "Una vez al día",
+  "Dos veces al día",
+  "Tres veces al día",
+  "Cuatro veces al día",
+  "Antes de dormir",
+  "Según necesidad",
+] as const;
+
+const medicationDurationOptions = [
+  "1 día",
+  "3 días",
+  "5 días",
+  "7 días",
+  "10 días",
+  "14 días",
+  "21 días",
+  "30 días",
+] as const;
+
+function inferMedicationRoute(presentation: string) {
+  const normalized = presentation.toLowerCase();
+
+  if (
+    normalized.includes("tableta") ||
+    normalized.includes("cápsula") ||
+    normalized.includes("capsula") ||
+    normalized.includes("jarabe") ||
+    normalized.includes("suspensión") ||
+    normalized.includes("suspension") ||
+    normalized.includes("solución oral") ||
+    normalized.includes("solucion oral") ||
+    normalized.includes("sobres")
+  ) {
+    return "Oral";
+  }
+
+  if (normalized.includes("crema") || normalized.includes("gel") || normalized.includes("pomada")) {
+    return "Tópica";
+  }
+
+  if (normalized.includes("spray nasal") || normalized.includes("gotas nasales")) {
+    return "Nasal";
+  }
+
+  if (normalized.includes("inhalador") || normalized.includes("nebul")) {
+    return "Inhalatoria";
+  }
+
+  if (normalized.includes("gotas oft")) {
+    return "Oftálmica";
+  }
+
+  if (normalized.includes("gotas ót") || normalized.includes("gotas ot")) {
+    return "Ótica";
+  }
+
+  if (normalized.includes("ampolla") || normalized.includes("inyectable")) {
+    return "Intramuscular";
+  }
+
+  if (normalized.includes("óvulo") || normalized.includes("ovulo")) {
+    return "Vaginal";
+  }
+
+  if (normalized.includes("supositorio")) {
+    return "Rectal";
+  }
+
+  return "";
+}
+
+function buildDosageOptions(commonDose?: string | null) {
+  return Array.from(
+    new Set(
+      [
+        commonDose?.trim() || "",
+        "5 mg",
+        "10 mg",
+        "20 mg",
+        "25 mg",
+        "40 mg",
+        "50 mg",
+        "100 mg",
+        "200 mg",
+        "400 mg",
+        "500 mg",
+        "600 mg",
+        "800 mg",
+        "1 g",
+        "5 mL",
+        "10 mL",
+        "15 mL",
+        "20 gotas",
+        "1 tableta",
+        "2 tabletas",
+        "1 cápsula",
+        "2 cápsulas",
+        "1 ampolla",
+        "1 puff",
+        "2 puff",
+      ].filter(Boolean),
+    ),
+  );
+}
+
 function TraceBlock({
   label,
   author,
@@ -203,11 +329,13 @@ export function EncounterWorkspace({
   professional,
   initialPatientId,
   initialEncounterId,
+  initialStage,
 }: {
   patients: Patient[];
   professional?: Profile | null;
   initialPatientId?: string;
   initialEncounterId?: string;
+  initialStage?: EncounterStage;
 }) {
   const { client } = useAuth();
   const numberFieldOptions = {
@@ -217,7 +345,7 @@ export function EncounterWorkspace({
   const [activeEncounter, setActiveEncounter] = useState<Encounter | null>(
     null,
   );
-  const [activeStage, setActiveStage] = useState<EncounterStage>("open");
+  const [activeStage, setActiveStage] = useState<EncounterStage>(initialStage ?? "open");
   const [serverError, setServerError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{
@@ -372,9 +500,9 @@ export function EncounterWorkspace({
     );
     nursingForm.setValue("encounterId", activeEncounter.id);
     if (activeStage === "open") {
-      setActiveStage("vitals");
+      setActiveStage(initialStage && initialStage !== "open" ? initialStage : "vitals");
     }
-  }, [activeEncounter, activeStage, medicalForm, nursingForm, vitalsForm]);
+  }, [activeEncounter, activeStage, initialStage, medicalForm, nursingForm, vitalsForm]);
 
   useEffect(() => {
     const bundle = encounterBundleQuery.data;
@@ -595,6 +723,10 @@ export function EncounterWorkspace({
         (item) => item.presentation === medicationDraft.presentation,
       ) ?? null,
     [availableMedicationPresentations, medicationDraft.presentation],
+  );
+  const dosageOptions = useMemo(
+    () => buildDosageOptions(selectedMedicationPresentation?.commonDose),
+    [selectedMedicationPresentation?.commonDose],
   );
   const encounterAuthor =
     activeEncounter?.createdByName ??
@@ -1971,6 +2103,9 @@ export function EncounterWorkspace({
                                     current.dosage ||
                                     selectedPresentation?.commonDose ||
                                     "",
+                                  route:
+                                    current.route ||
+                                    inferMedicationRoute(event.target.value),
                                 }));
                               }}
                             >
@@ -1993,7 +2128,7 @@ export function EncounterWorkspace({
                             label="Dosis"
                             helper={selectedMedicationPresentation?.commonDose}
                           >
-                            <input
+                            <select
                               value={medicationDraft.dosage}
                               onChange={(event) =>
                                 setMedicationDraft((current) => ({
@@ -2001,10 +2136,17 @@ export function EncounterWorkspace({
                                   dosage: event.target.value,
                                 }))
                               }
-                            />
+                            >
+                              <option value="">Selecciona una dosis</option>
+                              {dosageOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </FormField>
                           <FormField label="Vía">
-                            <input
+                            <select
                               value={medicationDraft.route}
                               onChange={(event) =>
                                 setMedicationDraft((current) => ({
@@ -2012,10 +2154,17 @@ export function EncounterWorkspace({
                                   route: event.target.value,
                                 }))
                               }
-                            />
+                            >
+                              <option value="">Selecciona una vía</option>
+                              {medicationRouteOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </FormField>
                           <FormField label="Frecuencia">
-                            <input
+                            <select
                               value={medicationDraft.frequency}
                               onChange={(event) =>
                                 setMedicationDraft((current) => ({
@@ -2023,10 +2172,17 @@ export function EncounterWorkspace({
                                   frequency: event.target.value,
                                 }))
                               }
-                            />
+                            >
+                              <option value="">Selecciona una frecuencia</option>
+                              {medicationFrequencyOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </FormField>
                           <FormField label="Duración">
-                            <input
+                            <select
                               value={medicationDraft.duration}
                               onChange={(event) =>
                                 setMedicationDraft((current) => ({
@@ -2034,7 +2190,14 @@ export function EncounterWorkspace({
                                   duration: event.target.value,
                                 }))
                               }
-                            />
+                            >
+                              <option value="">Selecciona una duración</option>
+                              {medicationDurationOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
                           </FormField>
                         </div>
                         <FormField label="Indicaciones farmacológicas">

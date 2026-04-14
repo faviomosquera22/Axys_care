@@ -22,12 +22,6 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     gap: 6,
   },
-  closingEyebrow: {
-    fontSize: 10,
-    color: "#6a6056",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
   closingName: { fontSize: 17, color: "#1f1a16" },
   closingLine: { fontSize: 11, color: "#4d463f" },
   closingNote: { fontSize: 9, color: "#7a7168", marginTop: 10 },
@@ -123,7 +117,6 @@ export function EncounterSummaryDocument({
       </Page>
       <Page size="A4" style={styles.closingPage}>
         <View style={styles.closingCard}>
-          <Text style={styles.closingEyebrow}>Cierre profesional</Text>
           <Text style={styles.closingName}>{professionalName}</Text>
           <Text style={styles.closingLine}>{professionLine}</Text>
           <Text style={styles.closingLine}>

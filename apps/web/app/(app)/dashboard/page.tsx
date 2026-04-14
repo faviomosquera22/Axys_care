@@ -4,13 +4,15 @@ import { listAppointments, listEncounters, listPatients } from "@axyscare/core-d
 import { EmptyStatePanel, LoadingStateCard, MetricCard, SectionHeading, StatusBadge } from "@axyscare/ui-shared";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { DashboardChart } from "@/components/charts/dashboard-chart";
+import Link from "next/link";
+import { DashboardChart, type DashboardChartStatus } from "@/components/charts/dashboard-chart";
 import { readTrackedEvents, type AnalyticsEvent } from "@/lib/client-analytics";
 import { useAuth } from "@/components/providers/providers";
 
 export default function DashboardPage() {
   const { client } = useAuth();
   const [recentEvents, setRecentEvents] = useState<AnalyticsEvent[]>([]);
+  const [selectedAppointmentStatus, setSelectedAppointmentStatus] = useState<DashboardChartStatus | null>(null);
   const appointmentsQuery = useQuery({
     queryKey: ["appointments", "dashboard"],
     queryFn: () => listAppointments(client),
@@ -35,6 +37,22 @@ export default function DashboardPage() {
   const openEncounters = encounters.filter((item) => item.status === "open");
   const unattendedAppointments = todayAppointments.filter((item) => item.status !== "atendida");
   const recentPatients = patients.slice(0, 5);
+  const patientNameMap = new Map(
+    patients.map((patient) => [patient.id, `${patient.firstName} ${patient.lastName}`.trim()]),
+  );
+  const appointmentsForSelectedStatus = selectedAppointmentStatus
+    ? appointments.filter((appointment) => appointment.status === selectedAppointmentStatus)
+    : [];
+  const selectedStatusLabel =
+    selectedAppointmentStatus === "programada"
+      ? "Programadas"
+      : selectedAppointmentStatus === "confirmada"
+        ? "Confirmadas"
+        : selectedAppointmentStatus === "atendida"
+          ? "Atendidas"
+          : selectedAppointmentStatus === "no_asistio"
+            ? "No asistió"
+            : "";
   const nextActionLabel = openEncounters.length
     ? "Retomar encounters abiertos"
     : unattendedAppointments.length
@@ -109,7 +127,57 @@ export default function DashboardPage() {
       </div>
 
       <div className="two-column">
-        <DashboardChart appointments={appointments} />
+        <div className="stack">
+          <DashboardChart
+            appointments={appointments}
+            activeStatus={selectedAppointmentStatus}
+            onSelectStatus={(status) =>
+              setSelectedAppointmentStatus((current) => (current === status ? null : status))
+            }
+          />
+          {selectedAppointmentStatus ? (
+            <div className="ax-card">
+              <SectionHeading
+                title={`Pacientes en ${selectedStatusLabel}`}
+                description="Listado de citas incluidas en la barra seleccionada."
+                action={
+                  <button
+                    type="button"
+                    className="pill-link"
+                    onClick={() => setSelectedAppointmentStatus(null)}
+                  >
+                    Limpiar
+                  </button>
+                }
+              />
+              {appointmentsForSelectedStatus.length ? (
+                appointmentsForSelectedStatus.map((appointment) => (
+                  <div key={appointment.id} className="list-row">
+                    <div>
+                      <strong>{patientNameMap.get(appointment.patientId) ?? "Paciente sin nombre visible"}</strong>
+                      <p className="muted">
+                        {new Date(appointment.startAt).toLocaleString()} · {appointment.reason}
+                      </p>
+                    </div>
+                    <div className="btn-row">
+                      <Link href={`/pacientes/${appointment.patientId}`} className="pill-link">
+                        Ver paciente
+                      </Link>
+                      <Link href="/agenda" className="pill-link">
+                        Ver agenda
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyStatePanel
+                  title="No hay citas para este estado."
+                  description="El gráfico quedó filtrado, pero no hay registros visibles en la agenda actual para esa barra."
+                />
+              )}
+            </div>
+          ) : null}
+        </div>
         <div className="stack">
           <div className="ax-card">
             <SectionHeading
